@@ -61,6 +61,7 @@
 
 #include "gecko_bglib.h"
 #include "uart.h"
+#include "user_command.h" //custom BGAPI commands for coex
 
 BGLIB_DEFINE();
 
@@ -622,17 +623,22 @@ int main(int argc, char* argv[])
         rsp = gecko_cmd_le_gap_set_mode(le_gap_user_data,le_gap_undirected_connectable);
 
 			} else if (app_state == verify_custom_bgapi) {
+        /* Verify response to custom BGAPI command implemented for coex.
         /* Version 1.x NCPs don't respond to this command at all, which hangs up
         the app waiting for the response. Only use on version 2.6+ */
-        uint8_t msg[] = {0x02};
+        uint8_t msg[] = {OPCODE_VER_GET};
         if ((version_major == 2 && version_minor >= 6) || version_major > 2) {
           printf("Verifying custom BGAPI command for coex.\n");
-          rsp = gecko_cmd_user_message_to_target(1,msg);
-          printf("result=0x%02x, data=0x%02x, ",
+          rsp = gecko_cmd_user_message_to_target(sizeof(msg),msg);
+          printf("result=0x%02x, version=%u.%u, magic=0x%02x, ",
               ((struct gecko_msg_user_message_to_target_rsp_t  *)rsp)->result,
-              ((struct gecko_msg_user_message_to_target_rsp_t  *)rsp)->data.data[0]);
-          if (((struct gecko_msg_user_message_to_target_rsp_t  *)rsp)->result == 0 &&
-              ((struct gecko_msg_user_message_to_target_rsp_t  *)rsp)->data.data[0] == 0) {
+              ((struct gecko_msg_user_message_to_target_rsp_t  *)rsp)->data.data[0],
+            ((struct gecko_msg_user_message_to_target_rsp_t  *)rsp)->data.data[1],
+            ((struct gecko_msg_user_message_to_target_rsp_t  *)rsp)->data.data[2]);
+          if (((struct gecko_msg_user_message_to_target_rsp_t  *)rsp)->result == bg_err_success &&
+          ((struct gecko_msg_user_message_to_target_rsp_t  *)rsp)->data.data[0] == USER_COMMAND_VER_HI &&
+          ((struct gecko_msg_user_message_to_target_rsp_t  *)rsp)->data.data[1] == USER_COMMAND_VER_LO &&
+              ((struct gecko_msg_user_message_to_target_rsp_t  *)rsp)->data.data[2] == USER_COMMAND_VER_MAGIC) {
             printf("response OK!\n");
           } else {
             printf("error in response!\n");
