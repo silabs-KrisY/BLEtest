@@ -65,16 +65,24 @@
 BGLIB_DEFINE();
 
 #define VERSION_MAJ	1u
-#define VERSION_MIN	5u
+#define VERSION_MIN	6u
+
+#define TRUE   1u
+#define FALSE  0u
 
 #define PHY test_phy_1m	//always use 1Mbit PHY for now
 
-/* Use HW flow control? (compile time option) */
-#define USE_RTS_CTS 0
+/* Default to use HW flow control? (compile time option)
+NOTE: Default can be overridden with -h command line option */
+#ifndef USE_RTS_CTS
+  #define USE_RTS_CTS FALSE
+#endif
 
 /* Program defaults - will use these if not specified on command line */
 #define DEFAULT_DURATION		1000*1000	//1 second
-#define DEFAULT_MODULATION		3	//unmodulated
+#ifndef DEFAULT_MODULATION
+  #define DEFAULT_MODULATION		3	//unmodulated (changed to '253' in later SDKs)
+#endif
 #define DEFAULT_CHANNEL			0	//2.402 GHz
 #define DEFAULT_POWER_LEVEL		50	//5 dBm
 #define DEFAULT_PACKET_LENGTH	25
@@ -97,7 +105,7 @@ static char *uart_port = NULL;
 static uint32_t baud_rate = 0;
 
 /* The modulation type */
-static char mod_type=DEFAULT_MODULATION;
+static uint8_t mod_type=DEFAULT_MODULATION;
 
 /* The power level */
 static uint16_t power_level=DEFAULT_POWER_LEVEL;
@@ -137,7 +145,8 @@ static enum app_states {
 	adv_test,
 	dtm_begin,
 	dtm_receive_started,
-	default_state
+	default_state,
+  verify_custom_bgapi
 } app_state;
 
 #define MAC_PSKEY_LENGTH	6u
@@ -152,6 +161,12 @@ static uint8_t fwrev_type_data[FWREV_TYPE_LEN] = {GATT_FWREV_LO,GATT_FWREV_HI};
 static uint16_t ctune_value=0; //unsigned int representation of ctune
 static uint8_t ctune_array[CTUNE_PSKEY_LENGTH]; //ctune value to be stored (little endian)
 static uint8_t mac_address[MAC_PSKEY_LENGTH]; //mac address to be stored
+
+/* Store NCP version information */
+static uint8_t version_major;
+static uint8_t version_minor;
+
+static uint8_t hwflow_enable = USE_RTS_CTS; //hwflow defaulted from define
 
 static void print_usage(void);
 void print_usage(void)
@@ -171,6 +186,8 @@ void print_usage(void)
 	printf("-f Read FW revision string from Device Information (GATT)\n");
 	printf("-e Enter a fast advertisement mode with scan response for TIS/TRP chamber testing\n");
 	printf("-d Run as a daemon process.\n");
+  printf("-h <0/1> Disable/Enable hardware flow control (RTS/CTS).\n");
+  printf("-b Verify custom BGAPI for coex.\n");
 	printf("Example - transmit PRBS9 payload of length=25 for 10 seconds on 2402 MHz at 5.5dBm output power level on device connected to serial port /dev/ttyAMA0 :\n\tBLEtest -t 10000 -m 0 -p 55 -u /dev/ttyAMA0 -c 0 -l 25\n\n\n");
 }
 
@@ -208,7 +225,7 @@ void sig_handler(int signo)
 		gecko_cmd_system_reset(0); /* reset NCP */
 		sleep(1);
 		uartClose();
-		exit(1);
+		exit(EXIT_SUCCESS);
 	}
 }
 
@@ -243,11 +260,7 @@ int hw_init(int argc, char* argv[])
 	} else if(!strncasecmp(argv[argCount],"-m",CMP_LENGTH))
 	{
 		mod_type = atoi(argv[argCount+1]);
-		if (mod_type>3)
-		{
-		  printf("Error in modulation type: max value 3\n");
-		  exit(EXIT_FAILURE);
-		}
+
 	} else if(!strncasecmp(argv[argCount],"-p",CMP_LENGTH))
 	{
 		power_level = atoi(argv[argCount+1]);
@@ -348,13 +361,28 @@ int hw_init(int argc, char* argv[])
 			exit(EXIT_FAILURE);
 		}
 	}
+  else if(!strncasecmp(argv[argCount],"-h",CMP_LENGTH))
+	{
+		/* enable/disable HW flow control (RTS/CTS) */
+    hwflow_enable = atoi(argv[argCount+1]);
+		if (hwflow_enable!= 0 && hwflow_enable!= 1 )
+		{
+		  printf("Error in hw flow argument: '0' for disabled, '1' for enabled\n");
+		  exit(EXIT_FAILURE);
+		}
+	}
+  else if(!strncasecmp(argv[argCount],"-b",CMP_LENGTH))
+	{
+		/* Verify custom BGAPI */
+    app_state = verify_custom_bgapi;
+	}
 		argCount=argCount+1;
   }
 
     /**
     * Initialise the serial port.
     */
-    return uartOpen((int8_t*)uart_port, baud_rate,USE_RTS_CTS,100);
+    return uartOpen((int8_t*)uart_port, baud_rate,hwflow_enable,100);
 }
 
 /**
@@ -399,14 +427,14 @@ int main(int argc, char* argv[])
 		{
 			printf("daemon fork failed! Exiting.\n");
 			// Return failure in exit status
-			exit(1);
+			exit(EXIT_FAILURE);
 		}
 		// PARENT PROCESS. Need to kill it.
 		if (process_id > 0)
 		{
 			printf("Child process %d created\n", process_id);
 			// return success in exit status
-			exit(0);
+			exit(EXIT_SUCCESS);
 		}
 
 		//unmask the file mode
@@ -417,7 +445,7 @@ int main(int argc, char* argv[])
 		if(sid < 0)
 		{
 			// Return failure
-			exit(1);
+			exit(EXIT_FAILURE);
 		}
 
 		// Change the current working directory to root.
@@ -443,26 +471,28 @@ int main(int argc, char* argv[])
 	// handler logic right inside each "case" block.
 	// ========================================================================================
 	while (1)
-    {
+  {
 		// blocking wait for event API packet
 		evt = gecko_wait_event();
 
 		// if a non-blocking implementation is needed, use gecko_peek_event() instead
 		// (will return NULL instead of packet struct pointer if no event is ready)
 
-        switch (BGLIB_MSG_ID(evt -> header))
-        {
-		// SYSTEM BOOT (power-on/reset)
+        switch (BGLIB_MSG_ID(evt -> header)) {
+		    // SYSTEM BOOT (power-on/reset)
         case gecko_evt_system_boot_id:
-			// VERBOSE PACKET OUTPUT
-			printf("boot pkt rcvd: gecko_evt_system_boot(%d, %d, %d, %d, %d, %d)\n",
-				evt->data.evt_system_boot.major,
-				evt->data.evt_system_boot.minor,
-				evt->data.evt_system_boot.patch,
-				evt->data.evt_system_boot.build,
-				evt->data.evt_system_boot.bootloader,
-				evt->data.evt_system_boot.hw
-				);
+        /* Store version info */
+        version_major = evt->data.evt_system_boot.major;
+        version_minor = evt->data.evt_system_boot.minor;
+
+        printf("\nboot pkt rcvd: gecko_evt_system_boot(%d, %d, %d, %d, 0x%8x, %d)\n",
+               version_major,
+               version_minor,
+               evt->data.evt_system_boot.patch,
+               evt->data.evt_system_boot.build,
+               evt->data.evt_system_boot.bootloader,
+               evt->data.evt_system_boot.hw
+        );
 
 			/* Read and print MAC address */
 			rsp=gecko_cmd_system_get_bt_address();
@@ -475,6 +505,16 @@ int main(int argc, char* argv[])
 				((struct gecko_msg_system_get_bt_address_rsp_t *)rsp)->address.addr[0]
 				);
 
+        /* Default to PTA disabled so PTA doesn't gate any of the DTM outputs.
+          Don't print any status messages. If coex support can't be enabled
+          because it isn't built-in to the NCP, it's OK.
+          NOTE: This requires building host with BG SDK v2.6 or later */
+
+        /* Version 1.x NCPs don't respond to this command at all, which hangs up
+        the app waiting for the response. Only use on version 2.6+ */
+        if ((version_major == 2 && version_minor >= 6) || version_major > 2) {
+          gecko_cmd_coex_set_options(coex_option_enable, FALSE);
+        }
 
 			/* Run test commands */
 			/* deal with flash writes first, since reboot is needed to take effect */
@@ -581,12 +621,39 @@ int main(int argc, char* argv[])
         rsp = gecko_cmd_le_gap_set_adv_parameters(TEST_ADV_INTERVAL_MS/ADV_INTERVAL_UNIT,TEST_ADV_INTERVAL_MS/ADV_INTERVAL_UNIT,CHANNEL_MAP_ALL); //advertise on all channels at specified interval
         rsp = gecko_cmd_le_gap_set_mode(le_gap_user_data,le_gap_undirected_connectable);
 
-			}
+			} else if (app_state == verify_custom_bgapi) {
+        /* Version 1.x NCPs don't respond to this command at all, which hangs up
+        the app waiting for the response. Only use on version 2.6+ */
+        uint8_t msg[] = {0x02};
+        if ((version_major == 2 && version_minor >= 6) || version_major > 2) {
+          printf("Verifying custom BGAPI command for coex.\n");
+          rsp = gecko_cmd_user_message_to_target(1,msg);
+          printf("result=0x%02x, data=0x%02x, ",
+              ((struct gecko_msg_user_message_to_target_rsp_t  *)rsp)->result,
+              ((struct gecko_msg_user_message_to_target_rsp_t  *)rsp)->data.data[0]);
+          if (((struct gecko_msg_user_message_to_target_rsp_t  *)rsp)->result == 0 &&
+              ((struct gecko_msg_user_message_to_target_rsp_t  *)rsp)->data.data[0] == 0) {
+            printf("response OK!\n");
+          } else {
+            printf("error in response!\n");
+          }
+        } else {
+          printf("Custom BGAPI not supported in NCP version %d.%d\n",
+              version_major, version_minor);
+        }
+        exit(EXIT_SUCCESS);
+
+      }
 			else if (ps_state == ps_none) {
-				printf("Outputting modulation type %d for %d ms at %d MHz at %.1f dBm\n", mod_type, duration_usec/1000, 2402+(2*channel),(float)power_level/10);
+				printf("Outputting modulation type %u for %d ms at %d MHz at %.1f dBm\n", mod_type, duration_usec/1000, 2402+(2*channel),(float)power_level/10);
 				/*Run test commands */
 				gecko_cmd_system_set_tx_power(power_level);
-				gecko_cmd_test_dtm_tx(mod_type,packet_length,channel,PHY);
+				rsp = gecko_cmd_test_dtm_tx(mod_type,packet_length,channel,PHY);
+        if (((struct gecko_msg_test_dtm_tx_rsp_t  *)rsp)->result)
+        {
+          printf("Error in DTM TX command, result=0x%02X\n",((struct gecko_msg_test_dtm_tx_rsp_t  *)rsp)->result);
+          exit(EXIT_FAILURE);
+        }
 				usleep(duration_usec);	/* sleep during test */
 				gecko_cmd_test_dtm_end();
 			}
@@ -602,12 +669,12 @@ int main(int argc, char* argv[])
 				{
 					//This is the event received at the end of the test
 					printf("DTM receive completed. Number of packets received: %d\n",evt->data.evt_test_dtm_completed.number_of_packets);
-					exit(1);	//test done - terminate
+					exit(EXIT_SUCCESS);	//test done - terminate
 				}
 			  else {
 				/* Not sure how we got here - but exit anyways */
 				printf("Test completed!\n");
-				exit(1); //test done - terminate
+				exit(EXIT_SUCCESS); //test done - terminate
 			}
 		  /* evt->data.evt_test_dtm_completed.number_of_packets */
 
@@ -644,17 +711,12 @@ int main(int argc, char* argv[])
 							break;
 					}
 					printf("Run the uart_dfu application to update the firmware.\n");
-					exit(1); //terminate
-			case gecko_evt_endpoint_status_id:
-					/* we get these when starting up - ignore them */
-					break;
+					exit(EXIT_FAILURE); //terminate
 			default:
 		       printf("Unhandled event received, event ID: 0x%2x\n", BGLIB_MSG_ID(evt -> header));
 		      break;
-
-
 		}
-    }
+  }
 
     return 0;
 }
