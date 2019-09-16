@@ -61,7 +61,6 @@
 
 #include "gecko_bglib.h"
 #include "uart.h"
-#include "user_command.h" //custom BGAPI commands for coex
 
 BGLIB_DEFINE();
 
@@ -82,7 +81,7 @@ NOTE: Default can be overridden with -h command line option */
 /* Program defaults - will use these if not specified on command line */
 #define DEFAULT_DURATION		1000*1000	//1 second
 #ifndef DEFAULT_MODULATION
-  #define DEFAULT_MODULATION		3	//unmodulated (changed to '253' in later SDKs)
+  #define DEFAULT_MODULATION		253	//unmodulated ('3' for early NCPs, changed to '253' in later SDKs)
 #endif
 #define DEFAULT_CHANNEL			0	//2.402 GHz
 #define DEFAULT_POWER_LEVEL		50	//5 dBm
@@ -150,6 +149,10 @@ static enum app_states {
   verify_custom_bgapi
 } app_state;
 
+#define MAX_CUST_BGAPI_STRING_LEN  16u
+uint8_t cust_bgapi_data[MAX_CUST_BGAPI_STRING_LEN/2]; //half of string length due to ascii hex data in string
+uint8_t cust_bgapi_len; //how many bytes in cust_bgapi_data
+
 #define MAC_PSKEY_LENGTH	6u
 #define CTUNE_PSKEY_LENGTH	2u
 #define MAX_CTUNE_VALUE 511u
@@ -170,6 +173,13 @@ static uint8_t version_minor;
 static uint8_t hwflow_enable = USE_RTS_CTS; //hwflow defaulted from define
 
 static void print_usage(void);
+
+unsigned int toInt(char c) {
+  if (c >= '0' && c <= '9') return      c - '0';
+  if (c >= 'A' && c <= 'F') return 10 + c - 'A';
+  if (c >= 'a' && c <= 'f') return 10 + c - 'a';
+  return -1;
+}
 void print_usage(void)
 {
 	printf("\n Arguments: \n");
@@ -232,16 +242,16 @@ void sig_handler(int signo)
 
 int hw_init(int argc, char* argv[])
 {
-    int argCount = 1;  /* Used for parsing command line arguments */
-	char *temp;
-	int values[8];
-	uint8_t i;
+  int argCount = 1;  /* Used for parsing command line arguments */
+  char *temp;
+  int values[8];
+  uint8_t i;
 
-    /**
-    * Handle the command-line arguments.
-    */
-    baud_rate = default_baud_rate;
-	uart_port = default_uart_port;
+  /**
+  * Handle the command-line arguments.
+  */
+  baud_rate = default_baud_rate;
+  uart_port = default_uart_port;
 
 	/* Let's go ahead and start parsing the command line arguments */
   if (argc > 1)
@@ -374,7 +384,24 @@ int hw_init(int argc, char* argv[])
 	}
   else if(!strncasecmp(argv[argCount],"-b",CMP_LENGTH))
 	{
+    uint8_t string_len;
+
+    string_len = strlen(argv[argCount+1]);
+    cust_bgapi_len = string_len/2;
+    if (string_len > MAX_CUST_BGAPI_STRING_LEN)
+    {
+      printf("String too long in -b argument: string length %lu, max = %d\n",strlen(argv[argCount+1]),MAX_CUST_BGAPI_STRING_LEN);
+		  exit(EXIT_FAILURE);
+    }
 		/* Verify custom BGAPI */
+    /* DEBUG */
+    printf("Hex data: ");
+    for (i=0; i != cust_bgapi_len; i++) {
+      cust_bgapi_data[i] = 16 * toInt(argv[argCount+1][2*i]) + toInt(argv[argCount+1][2*i+1]);
+      printf("%X ",cust_bgapi_data[i]);
+    }
+    printf("\n");
+    /* end debug */
     app_state = verify_custom_bgapi;
 	}
 		argCount=argCount+1;
@@ -623,32 +650,27 @@ int main(int argc, char* argv[])
         rsp = gecko_cmd_le_gap_set_mode(le_gap_user_data,le_gap_undirected_connectable);
 
 			} else if (app_state == verify_custom_bgapi) {
-        /* Verify response to custom BGAPI command implemented for coex.
-        /* Version 1.x NCPs don't respond to this command at all, which hangs up
-        the app waiting for the response. Only use on version 2.6+ */
-        uint8_t msg[] = {OPCODE_VER_GET};
-        if ((version_major == 2 && version_minor >= 6) || version_major > 2) {
-          printf("Verifying custom BGAPI command for coex.\n");
-          rsp = gecko_cmd_user_message_to_target(sizeof(msg),msg);
-          printf("result=0x%02x, version=%u.%u, magic=0x%02x, ",
-              ((struct gecko_msg_user_message_to_target_rsp_t  *)rsp)->result,
-              ((struct gecko_msg_user_message_to_target_rsp_t  *)rsp)->data.data[0],
-            ((struct gecko_msg_user_message_to_target_rsp_t  *)rsp)->data.data[1],
-            ((struct gecko_msg_user_message_to_target_rsp_t  *)rsp)->data.data[2]);
-          if (((struct gecko_msg_user_message_to_target_rsp_t  *)rsp)->result == bg_err_success &&
-          ((struct gecko_msg_user_message_to_target_rsp_t  *)rsp)->data.data[0] == USER_COMMAND_VER_HI &&
-          ((struct gecko_msg_user_message_to_target_rsp_t  *)rsp)->data.data[1] == USER_COMMAND_VER_LO &&
-              ((struct gecko_msg_user_message_to_target_rsp_t  *)rsp)->data.data[2] == USER_COMMAND_VER_MAGIC) {
-            printf("response OK!\n");
-          } else {
-            printf("error in response!\n");
-          }
-        } else {
-          printf("Custom BGAPI not supported in NCP version %d.%d\n",
-              version_major, version_minor);
-        }
-        exit(EXIT_SUCCESS);
+        /* Send custom BGAPI command and print response */
 
+        rsp = gecko_cmd_user_message_to_target(cust_bgapi_len,cust_bgapi_data);
+        if (((struct gecko_msg_user_message_to_target_rsp_t  *)rsp)->result != bg_err_success)
+        {
+          printf("Custom BGAPI error returned from NCP: result=0x%02x\n", ((struct gecko_msg_user_message_to_target_rsp_t  *)rsp)->result);
+          exit(EXIT_FAILURE);
+        } else {
+          /* Print returned payload */
+          if (((struct gecko_msg_user_message_to_target_rsp_t  *)rsp)->data.len != 0) {
+            uint8_t i;
+            printf("BGAPI success! Returned payload: ");
+            for (i=0; i != ((struct gecko_msg_user_message_to_target_rsp_t  *)rsp)->data.len;i++) {
+              printf("%02X ",((struct gecko_msg_user_message_to_target_rsp_t  *)rsp)->data.data[i]);
+            }
+            printf("\n");
+          } else {
+            printf("BGAPI success! No payload\n");
+          }
+          exit(EXIT_SUCCESS);
+        }
       }
 			else if (ps_state == ps_none) {
 				printf("Outputting modulation type %u for %d ms at %d MHz at %.1f dBm\n", mod_type, duration_usec/1000, 2402+(2*channel),(float)power_level/10);
