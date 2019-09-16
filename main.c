@@ -175,6 +175,7 @@ static uint8_t hwflow_enable = USE_RTS_CTS; //hwflow defaulted from define
 static void print_usage(void);
 
 unsigned int toInt(char c) {
+  /* Convert ASCII hex to binary */
   if (c >= '0' && c <= '9') return      c - '0';
   if (c >= 'A' && c <= 'F') return 10 + c - 'A';
   if (c >= 'a' && c <= 'f') return 10 + c - 'a';
@@ -198,7 +199,7 @@ void print_usage(void)
 	printf("-e Enter a fast advertisement mode with scan response for TIS/TRP chamber testing\n");
 	printf("-d Run as a daemon process.\n");
   printf("-h <0/1> Disable/Enable hardware flow control (RTS/CTS).\n");
-  printf("-b Verify custom BGAPI for coex.\n");
+  printf("-b <ASCII hex command string> Verify custom BGAPI command.\n");
 	printf("Example - transmit PRBS9 payload of length=25 for 10 seconds on 2402 MHz at 5.5dBm output power level on device connected to serial port /dev/ttyAMA0 :\n\tBLEtest -t 10000 -m 0 -p 55 -u /dev/ttyAMA0 -c 0 -l 25\n\n\n");
 }
 
@@ -384,8 +385,8 @@ int hw_init(int argc, char* argv[])
 	}
   else if(!strncasecmp(argv[argCount],"-b",CMP_LENGTH))
 	{
+    /* Verify custom BGAPI by sending a custom BGAPI command and printing the response */
     uint8_t string_len;
-
     string_len = strlen(argv[argCount+1]);
     cust_bgapi_len = string_len/2;
     if (string_len > MAX_CUST_BGAPI_STRING_LEN)
@@ -393,15 +394,11 @@ int hw_init(int argc, char* argv[])
       printf("String too long in -b argument: string length %lu, max = %d\n",strlen(argv[argCount+1]),MAX_CUST_BGAPI_STRING_LEN);
 		  exit(EXIT_FAILURE);
     }
-		/* Verify custom BGAPI */
-    /* DEBUG */
-    printf("Hex data: ");
+
     for (i=0; i != cust_bgapi_len; i++) {
+      /* Convert arg string "040101" to binary data */
       cust_bgapi_data[i] = 16 * toInt(argv[argCount+1][2*i]) + toInt(argv[argCount+1][2*i+1]);
-      printf("%X ",cust_bgapi_data[i]);
     }
-    printf("\n");
-    /* end debug */
     app_state = verify_custom_bgapi;
 	}
 		argCount=argCount+1;
