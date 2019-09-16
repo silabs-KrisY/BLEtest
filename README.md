@@ -160,7 +160,6 @@ Test completed!
 
 6. Send custom BGAPI payload "0x07" and print response payload.
 ```
-$ ./exe-host/BLEtest -u /dev/ttyACM0 -x 0x0155 -m 3 -t 10000 -c 0 -p 50
 $ ./exe/BLEtest -u /dev/ttyACM0 -b 07
 
 ------------------------
