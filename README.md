@@ -112,7 +112,7 @@ boot pkt rcvd: gecko_evt_system_boot(1, 0, 2, 755, 0, 1)
 MAC address: 00:0B:57:07:6C:04
 Outputting modulation type 0 for 10000 ms at 2404 MHz at 8.0 dBm
 Test completed!
-	```
+```
 
 3. Receive DTM (direct test mode) packets for 10 seconds on 2404 MHz on device connected to serial port /dev/ttyAMA0. Note that the printout below shows an example of 100% packet reception rate when running example 2 (TX with PRBS9 DTM length=25) on a separate device.
 ```
@@ -156,6 +156,19 @@ boot pkt rcvd: gecko_evt_system_boot(1, 0, 2, 755, 0, 1)
 MAC address: 00:0B:57:00:E5:01
 Outputting modulation type 3 for 10000 ms at 2402 MHz at 5.0 dBm
 Test completed!
+```
+
+6. Send custom BGAPI payload "0x07" and print response payload.
+```
+$ ./exe-host/BLEtest -u /dev/ttyACM0 -x 0x0155 -m 3 -t 10000 -c 0 -p 50
+$ ./exe/BLEtest -u /dev/ttyACM0 -b 07
+
+------------------------
+Waiting for boot pkt...
+
+boot pkt rcvd: gecko_evt_system_boot(2, 12, 1, 126, 0x 1070000, 1)
+MAC address: 00:0D:6F:20:B2:D6
+BGAPI success! Returned payload: BF 8F AF 7F 87 00 37 0F AF 10 10 FF 00 00 00 04 04
 ```
 
 ## Deployment
