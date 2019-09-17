@@ -326,8 +326,9 @@ int hw_init(int argc, char* argv[])
 		/* check range */
 		if (ctune_value > MAX_CTUNE_VALUE)
 		{
-				printf("Ctune value entered (0x%2x) is larger than the maximum allowed value of 0x%2x. Ignoring argument.\n",
+				printf("Error! Ctune value entered (0x%2x) is larger than the maximum allowed value of 0x%2x.\n",
 						ctune_value, MAX_CTUNE_VALUE);
+        exit(EXIT_FAILURE);
 		} else
 		{
 			  ps_state = ps_write_ctune; //init ps state machine

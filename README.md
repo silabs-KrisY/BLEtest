@@ -158,9 +158,9 @@ Outputting modulation type 3 for 10000 ms at 2402 MHz at 5.0 dBm
 Test completed!
 ```
 
-6. Send custom BGAPI payload "0x07" and print response payload.
+6. Send custom BGAPI payload "0x06" and print response payload.
 ```
-$ ./exe/BLEtest -u /dev/ttyACM0 -b 07
+$ ./exe/BLEtest -u /dev/ttyACM0 -b 06
 
 ------------------------
 Waiting for boot pkt...
