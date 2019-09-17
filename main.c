@@ -198,8 +198,8 @@ void print_usage(void)
 	printf("-c <channel, 2402 MHz + 2*channel>\n");
 	printf("-l <packet length, ignored for unmodulated carrier>\n");
 	printf("-r DTM receive test. Prints number of received DTM packets.\n");
-	printf("-x <16-bit crystal tuning value, e.g. 0x0136>\n");
-	printf("-a <48-bit MAC address, e.g. 01:02:03:04:05:06>\n\n");
+	printf("-x <Set 16-bit crystal tuning value, e.g. 0x0136>\n");
+	printf("-a <Set 48-bit MAC address, e.g. 01:02:03:04:05:06>\n\n");
 	printf("-z Read 16-bit crystal tuning value\n");
 	printf("-f Read FW revision string from Device Information (GATT)\n");
 	printf("-e Enter a fast advertisement mode with scan response for TIS/TRP chamber testing\n");

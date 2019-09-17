@@ -76,8 +76,8 @@ Arguments:
 -c <channel, 2402 MHz + 2*channel>
 -l <packet length, ignored for unmodulated carrier>
 -r DTM receive test. Prints number of received DTM packets.
--x <16-bit crystal tuning value, e.g. 0x0136>
--a <48-bit MAC address, e.g. 01:02:03:04:05:06>
+-x <Set 16-bit crystal tuning value, e.g. 0x0136>
+-a <Set 48-bit MAC address, e.g. 01:02:03:04:05:06>
 -z Read 16-bit crystal tuning value
 -f Read FW revision string from Device Information (GATT)
 -e Enter a fast advertisement mode with scan response for TIS/TRP chamber testing
