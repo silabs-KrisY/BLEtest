@@ -175,11 +175,17 @@ static uint8_t hwflow_enable = USE_RTS_CTS; //hwflow defaulted from define
 static void print_usage(void);
 
 unsigned int toInt(char c) {
-  /* Convert ASCII hex to binary */
-  if (c >= '0' && c <= '9') return      c - '0';
-  if (c >= 'A' && c <= 'F') return 10 + c - 'A';
-  if (c >= 'a' && c <= 'f') return 10 + c - 'a';
-  return -1;
+  /* Convert ASCII hex to binary, return -1 if error */
+  if (c >= '0' && c <= '9') {
+    return      c - '0';
+  } else if (c >= 'A' && c <= 'F') {
+    return 10 + c - 'A';
+  } else if (c >= 'a' && c <= 'f') {
+    return 10 + c - 'a';
+  } else {
+    return -1; //error
+  }
+
 }
 void print_usage(void)
 {
@@ -387,6 +393,8 @@ int hw_init(int argc, char* argv[])
 	{
     /* Verify custom BGAPI by sending a custom BGAPI command and printing the response */
     uint8_t string_len;
+    int8_t upper_nib;
+    int8_t lower_nib;
     string_len = strlen(argv[argCount+1]);
     cust_bgapi_len = string_len/2;
     if (string_len > MAX_CUST_BGAPI_STRING_LEN)
@@ -396,8 +404,16 @@ int hw_init(int argc, char* argv[])
     }
 
     for (i=0; i != cust_bgapi_len; i++) {
-      /* Convert arg string "040101" to binary data */
-      cust_bgapi_data[i] = 16 * toInt(argv[argCount+1][2*i]) + toInt(argv[argCount+1][2*i+1]);
+      /* Convert arg string (e.g. "040101") to binary data */
+      upper_nib = toInt(argv[argCount+1][2*i]);
+      lower_nib = toInt(argv[argCount+1][2*i+1]);
+      if (lower_nib < 0 || upper_nib < 0) {
+        /* Problem with conversion - print error and exit */
+        printf("Error! \"%s\" is an invalid ascii hex string. The characters need to be A-F, a-f, or 0-9.\n",argv[argCount+1]);
+        exit(EXIT_FAILURE);
+      } else {
+        cust_bgapi_data[i] = (uint8_t) (16*upper_nib) + lower_nib;
+      }
     }
     app_state = verify_custom_bgapi;
 	}
@@ -648,7 +664,7 @@ int main(int argc, char* argv[])
 
 			} else if (app_state == verify_custom_bgapi) {
         /* Send custom BGAPI command and print response */
-
+        printf("Sending custom user message to target...\n");
         rsp = gecko_cmd_user_message_to_target(cust_bgapi_len,cust_bgapi_data);
         if (((struct gecko_msg_user_message_to_target_rsp_t  *)rsp)->result != bg_err_success)
         {
@@ -658,7 +674,7 @@ int main(int argc, char* argv[])
           /* Print returned payload */
           if (((struct gecko_msg_user_message_to_target_rsp_t  *)rsp)->data.len != 0) {
             uint8_t i;
-            printf("BGAPI success! Returned payload: ");
+            printf("BGAPI success! Returned payload (len=%d): ",((struct gecko_msg_user_message_to_target_rsp_t  *)rsp)->data.len);
             for (i=0; i != ((struct gecko_msg_user_message_to_target_rsp_t  *)rsp)->data.len;i++) {
               printf("%02X ",((struct gecko_msg_user_message_to_target_rsp_t  *)rsp)->data.data[i]);
             }
