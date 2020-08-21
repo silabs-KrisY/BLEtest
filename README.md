@@ -92,7 +92,7 @@ Examples:
 
 1. Transmit an unmodulated carrier for 10 seconds on 2402 at 5.0 dBm output power level on the device connected to serial port /dev/ttyAMA0:
 ```
-$ ./exe-host/BLEtest -t 10000 -m 253 -p 50 -u /dev/ttyAMA0 -c 0
+$ ./exe-host/BLEtest -t 10000 -m 254 -p 50 -u /dev/ttyAMA0 -c 0
 
 ------------------------
 Waiting for boot pkt...
