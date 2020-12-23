@@ -426,8 +426,8 @@ int hw_init(int argc, char* argv[])
   {
     /* Select PHY for test packets/waveforms */
     selected_phy = atoi(argv[argCount+1]);
-    if (selected_phy != test_phy_1m || selected_phy != test_phy_2m ||
-        selected_phy != test_phy_125k || selected_phy != test_phy_500k )
+    if (selected_phy != test_phy_1m && selected_phy != test_phy_2m &&
+        selected_phy != test_phy_125k && selected_phy != test_phy_500k )
     {
       printf("Error! Invalid phy argument, 0x%02x\n",selected_phy);
       exit(EXIT_FAILURE);
