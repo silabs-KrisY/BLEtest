@@ -10,7 +10,7 @@ These instructions will get you a copy of the project up and running on your loc
 
 ### Prerequisites
 
-1. Blue Gecko SDK (installed via Simplicity Studio).
+1. Blue Gecko SDK version 2.x (installed via Simplicity Studio). NOTE: This tool is not compatible with Blue Gecko SDK version 3.x.
 2. Linux/Posix build environment (OSX, Cygwin, Raspberry Pi, etc.).
 3. Blue Gecko / Mighty Gecko device running a serial UART NCP (Network Co-Processor) firmware image. See the "To Run" section below for more details.
 
@@ -84,6 +84,7 @@ Arguments:
 -d Run as a daemon process.
 -h <0/1> Disable/Enable hardware flow control (RTS/CTS). Default HW flow control state set by compile time define.
 -b <ASCII hex command string> Verify custom BGAPI command.
+-y <PHY selection for test packets/waveforms/RX mode, 0:1Mbps, 1:2Mbps, 2:125k LR coded, 3:500k LR coded.
 ```
 
 Refer to the [Blue Gecko API documentation](https://docs.silabs.com/bluetooth/latest/) for more details about the various arguments.
@@ -168,6 +169,19 @@ Waiting for boot pkt...
 boot pkt rcvd: gecko_evt_system_boot(2, 12, 1, 126, 0x 1070000, 1)
 MAC address: 00:0D:6F:20:B2:D6
 BGAPI success! Returned payload: BF 8F AF 7F 87 00 37 0F AF 10 10 FF 00 00 00 04 04
+```
+
+7. Transmit a PN9 continuously modulated output (100% duty cycle) on logical channel 19 (physical channel 21, 2444 MHz) at 10dBm for 5 seconds using the 2Mbps PHY.
+```
+$ ./exe/BLEtest -u /dev/ttyACM0 -m 253 -c 21 -p 100 -t 5000 -y 2
+
+------------------------
+Waiting for boot pkt...
+
+boot pkt rcvd: gecko_evt_system_boot(2, 12, 1, 126, 0x 1070000, 1)
+MAC address: 00:0D:6F:20:B2:D6
+Outputting modulation type 253 for 5000 ms at 2402 MHz at 10.0 dBm, phy=0x02
+Test completed!
 ```
 
 ## Deployment

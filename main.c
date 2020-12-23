@@ -65,12 +65,12 @@
 BGLIB_DEFINE();
 
 #define VERSION_MAJ	1u
-#define VERSION_MIN	6u
+#define VERSION_MIN	7u
 
 #define TRUE   1u
 #define FALSE  0u
 
-#define PHY test_phy_1m	//always use 1Mbit PHY for now
+#define DEFAULT_PHY test_phy_1m	//default to use 1Mbit PHY
 
 /* Default to use HW flow control? (compile time option)
 NOTE: Default can be overridden with -h command line option */
@@ -118,6 +118,9 @@ static uint8_t channel=DEFAULT_CHANNEL;
 
 /* packet length */
 static uint8_t packet_length=DEFAULT_PACKET_LENGTH;
+
+/* phy */
+static uint8_t selected_phy=DEFAULT_PHY;
 
 /* run as daemon? */
 static uint8_t daemon_flag = 0;
@@ -206,6 +209,7 @@ void print_usage(void)
 	printf("-d Run as a daemon process.\n");
   printf("-h <0/1> Disable/Enable hardware flow control (RTS/CTS). Default HW flow control state set by compile time define.\n");
   printf("-b <ASCII hex command string> Verify custom BGAPI command.\n");
+  printf("-y <PHY selection for test packets/waveforms/RX mode, 0:1Mbps, 1:2Mbps, 2:125k LR coded, 3:500k LR coded.>\n");
 	printf("Example - transmit PRBS9 payload of length=25 for 10 seconds on 2402 MHz at 5.5dBm output power level on device connected to serial port /dev/ttyAMA0 :\n\tBLEtest -t 10000 -m 0 -p 55 -u /dev/ttyAMA0 -c 0 -l 25\n\n\n");
 }
 
@@ -390,7 +394,7 @@ int hw_init(int argc, char* argv[])
 		  exit(EXIT_FAILURE);
 		}
 	}
-  else if(!strncasecmp(argv[argCount],"-b",CMP_LENGTH))
+  if(!strncasecmp(argv[argCount],"-b",CMP_LENGTH))
 	{
     /* Verify custom BGAPI by sending a custom BGAPI command and printing the response */
     uint8_t string_len;
@@ -418,6 +422,17 @@ int hw_init(int argc, char* argv[])
     }
     app_state = verify_custom_bgapi;
 	}
+  else if(!strncasecmp(argv[argCount],"-y",CMP_LENGTH))
+  {
+    /* Select PHY for test packets/waveforms */
+    selected_phy = atoi(argv[argCount+1]);
+    if (selected_phy != test_phy_1m || selected_phy != test_phy_2m ||
+        selected_phy != test_phy_125k || selected_phy != test_phy_500k )
+    {
+      printf("Error! Invalid phy argument, 0x%02x\n",selected_phy);
+      exit(EXIT_FAILURE);
+    }
+  }
 		argCount=argCount+1;
   }
 
@@ -644,8 +659,8 @@ int main(int argc, char* argv[])
 			}
 			else if (app_state == dtm_begin)
 			{
-        printf("DTM receive enabled, freq=%d MHz\n",2402+(2*channel));
-        gecko_cmd_test_dtm_rx(channel,PHY);
+        printf("DTM receive enabled, freq=%d MHz, phy=0x%02X\n",2402+(2*channel), selected_phy);
+        gecko_cmd_test_dtm_rx(channel,selected_phy);
         usleep(duration_usec);  /* sleep during test */
         gecko_cmd_test_dtm_end();
       }
@@ -669,7 +684,7 @@ int main(int argc, char* argv[])
         rsp = gecko_cmd_user_message_to_target(cust_bgapi_len,cust_bgapi_data);
         if (((struct gecko_msg_user_message_to_target_rsp_t  *)rsp)->result != bg_err_success)
         {
-          printf("Custom BGAPI error returned from NCP: result=0x%02x\n", ((struct gecko_msg_user_message_to_target_rsp_t  *)rsp)->result);
+          printf("Custom BGAPI error returned from NCP: result=0x%02X\n", ((struct gecko_msg_user_message_to_target_rsp_t  *)rsp)->result);
           exit(EXIT_FAILURE);
         } else {
           /* Print returned payload */
@@ -687,10 +702,11 @@ int main(int argc, char* argv[])
         }
       }
 			else if (ps_state == ps_none) {
-				printf("Outputting modulation type %u for %d ms at %d MHz at %.1f dBm\n", mod_type, duration_usec/1000, 2402+(2*channel),(float)power_level/10);
+				printf("Outputting modulation type %u for %d ms at %d MHz at %.1f dBm, phy=0x%02X\n", mod_type, duration_usec/1000, 2402+(2*channel),
+          (float)power_level/10, selected_phy);
 				/*Run test commands */
 				gecko_cmd_system_set_tx_power(power_level);
-				rsp = gecko_cmd_test_dtm_tx(mod_type,packet_length,channel,PHY);
+				rsp = gecko_cmd_test_dtm_tx(mod_type,packet_length,channel,selected_phy);
         if (((struct gecko_msg_test_dtm_tx_rsp_t  *)rsp)->result)
         {
           printf("Error in DTM TX command, result=0x%02X\n",((struct gecko_msg_test_dtm_tx_rsp_t  *)rsp)->result);
