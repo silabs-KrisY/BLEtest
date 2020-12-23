@@ -209,7 +209,7 @@ void print_usage(void)
 	printf("-d Run as a daemon process.\n");
   printf("-h <0/1> Disable/Enable hardware flow control (RTS/CTS). Default HW flow control state set by compile time define.\n");
   printf("-b <ASCII hex command string> Verify custom BGAPI command.\n");
-  printf("-y <PHY selection for test packets/waveforms/RX mode, 0:1Mbps, 1:2Mbps, 2:125k LR coded, 3:500k LR coded.>\n");
+  printf("-y <PHY selection for test packets/waveforms/RX mode, 1:1Mbps, 2:2Mbps, 3:125k LR coded, 4:500k LR coded.>\n");
 	printf("Example - transmit PRBS9 payload of length=25 for 10 seconds on 2402 MHz at 5.5dBm output power level on device connected to serial port /dev/ttyAMA0 :\n\tBLEtest -t 10000 -m 0 -p 55 -u /dev/ttyAMA0 -c 0 -l 25\n\n\n");
 }
 

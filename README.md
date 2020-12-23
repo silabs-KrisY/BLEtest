@@ -84,7 +84,7 @@ Arguments:
 -d Run as a daemon process.
 -h <0/1> Disable/Enable hardware flow control (RTS/CTS). Default HW flow control state set by compile time define.
 -b <ASCII hex command string> Verify custom BGAPI command.
--y <PHY selection for test packets/waveforms/RX mode, 0:1Mbps, 1:2Mbps, 2:125k LR coded, 3:500k LR coded.
+-y <PHY selection for test packets/waveforms/RX mode, 1:1Mbps, 2:2Mbps, 3:125k LR coded, 4:500k LR coded.>
 ```
 
 Refer to the [Blue Gecko API documentation](https://docs.silabs.com/bluetooth/latest/) for more details about the various arguments.
