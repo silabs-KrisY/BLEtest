@@ -6,6 +6,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.7.0] - 2020-12-23
+### Added
+- Ability to set PHY for DTM RX and TX commands.
+
+### Changed
+- Updated README.md with new PHY parameter.
+- Updated README.md to specify compatibility with Blue Gecko 2.x only.
+
 ## [1.6.0] - 2019-09-16
 ### Added
 - Ability to set HW flow control at run time or via build time #define
