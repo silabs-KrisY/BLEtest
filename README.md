@@ -70,7 +70,7 @@ Arguments:
 ```
 -v Print version number defined in application.
 -t <duration in ms>
--m <payload/modulation type, 0:PBRS9, 1:11110000 packet payload, 2:10101010 packet payload, 3:unmodulated carrier>
+-m <payload/modulation type, 0:PBRS9, 1:11110000 packet payload, 2:10101010 packet payload, 253:PN9 continuously modulated, 254:unmodulated carrier>
 -p <power level in 0.1dBm steps>
 -u <UART port name>
 -c <channel, 2402 MHz + 2*channel>
@@ -97,9 +97,9 @@ $ ./exe-host/BLEtest -t 10000 -m 254 -p 50 -u /dev/ttyAMA0 -c 0
 
 ------------------------
 Waiting for boot pkt...
-boot pkt rcvd: gecko_evt_system_boot(1, 0, 2, 755, 0, 1)
-MAC address: 00:0B:57:07:6C:04
-Outputting modulation type 253 for 10000 ms at 2402 MHz at 5.0 dBm
+boot pkt rcvd: gecko_evt_system_boot(2, 12, 1, 126, 0x 1070000, 1)
+MAC address: 00:0D:6F:20:B2:D6
+Outputting modulation type 254 for 10000 ms at 2402 MHz at 5.0 dBm, phy=0x01
 Test completed!
 ```
 
@@ -109,9 +109,9 @@ $ ./exe-host/BLEtest -t 10000 -m 0 -p 80 -u /dev/ttyAMA0 -c 1 -l 25
 
 ------------------------
 Waiting for boot pkt...
-boot pkt rcvd: gecko_evt_system_boot(1, 0, 2, 755, 0, 1)
-MAC address: 00:0B:57:07:6C:04
-Outputting modulation type 0 for 10000 ms at 2404 MHz at 8.0 dBm
+boot pkt rcvd: gecko_evt_system_boot(2, 12, 1, 126, 0x 1070000, 1)
+MAC address: 00:0D:6F:20:B2:D6
+Outputting modulation type 0 for 10000 ms at 2404 MHz at 8.0 dBm, phy=0x01
 Test completed!
 ```
 
@@ -133,29 +133,29 @@ $ ./exe-host/BLEtest -u /dev/ttyACM0 -a 01:02:03:04:05:06
 
 ------------------------
 Waiting for boot pkt...
-boot pkt rcvd: gecko_evt_system_boot(1, 0, 2, 755, 0, 1)
-MAC address: 00:0B:57:00:E5:01
+boot pkt rcvd: gecko_evt_system_boot(2, 12, 1, 126, 0x 1070000, 1)
+MAC address: 00:0D:6F:20:B2:D6
 Writing MAC address: 01:02:03:04:05:06
 Rebooting with new MAC address...
-boot pkt rcvd: gecko_evt_system_boot(1, 0, 2, 755, 0, 1)
+boot pkt rcvd: gecko_evt_system_boot(2, 12, 1, 126, 0x 1070000, 1)
 MAC address: 01:02:03:04:05:06
-Outputting modulation type 3 for 1000 ms at 2402 MHz at 5.0 dBm
+Outputting modulation type 254 for 1000 ms at 2402 MHz at 5.0 dBm, phy=0x01
 Test completed!
 ```
 
 5. Write crystal tuning value of 0x0155 to device connected to virtual COM port /dev/ttyACM0 and output test tone of 2402 MHz at 5.0 dBm for 10 seconds to verify frequency using a spectrum analyzer (set the instrument to 500 kHz bandwidth).
 ```
-$ ./exe-host/BLEtest -u /dev/ttyACM0 -x 0x0155 -m 3 -t 10000 -c 0 -p 50
+$ ./exe-host/BLEtest -u /dev/ttyACM0 -x 0x0155 -m 254 -t 10000 -c 0 -p 50
 
 ------------------------
 Waiting for boot pkt...
-boot pkt rcvd: gecko_evt_system_boot(1, 0, 2, 755, 0, 1)
-MAC address: 00:0B:57:00:E5:01
+boot pkt rcvd: gecko_evt_system_boot(2, 12, 1, 126, 0x 1070000, 1)
+MAC address: 00:0D:6F:20:B2:D6
 Writing ctune value to 0x0155
 Rebooting with new ctune value...
-boot pkt rcvd: gecko_evt_system_boot(1, 0, 2, 755, 0, 1)
-MAC address: 00:0B:57:00:E5:01
-Outputting modulation type 3 for 10000 ms at 2402 MHz at 5.0 dBm
+boot pkt rcvd: gecko_evt_system_boot(2, 12, 1, 126, 0x 1070000, 1)
+MAC address: 00:0D:6F:20:B2:D6
+Outputting modulation type 254 for 10000 ms at 2402 MHz at 5.0 dBm, phy=0x01
 Test completed!
 ```
 
