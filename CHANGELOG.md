@@ -4,7 +4,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [2.0.0] - 2021-10-22
+### Changed
+- Major updates to move to 3.x Bluetooth SDK API and project structure
+- Changes in execution parameters to use optparse
+- Removed daemon functionality (can easily run the process in the background)
+- Major documentation updates
 
 ## [1.7.0] - 2020-12-23
 ### Added

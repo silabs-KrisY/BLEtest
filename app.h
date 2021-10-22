@@ -1,6 +1,6 @@
 /***************************************************************************//**
  * @file
- * @brief main() function.
+ * @brief Application interface provided to main().
  *******************************************************************************
  * # License
  * <b>Copyright 2021 Silicon Laboratories Inc. www.silabs.com</b>
@@ -28,47 +28,30 @@
  *
  ******************************************************************************/
 
-#include <stdbool.h>
-#include <stdlib.h>
-#include "system.h"
-#include "app_signal.h"
-#include "app.h"
+#ifndef APP_H
+#define APP_H
 
-// Main loop execution status.
-static volatile bool run = true;
+#ifdef __cplusplus
+extern "C" {
+#endif
 
-// Custom signal handler.
-static void signal_handler(int sig)
-{
-  (void)sig;
-  run = false;
-  // Deinitialize the application.
-  app_deinit();
-}
+/**************************************************************************//**
+ * Application Init.
+ *****************************************************************************/
+void app_init(int argc, char *argv[]);
 
-int main(int argc, char *argv[])
-{
-  // Set up custom signal handler for user interrupt and termination request.
-  app_signal(SIGINT, signal_handler);
-  app_signal(SIGTERM, signal_handler);
+/**************************************************************************//**
+ * Application Process Action.
+ *****************************************************************************/
+void app_process_action(void);
 
-  // Initialize Silicon Labs device, system, service(s) and protocol stack(s).
-  // Note that if the kernel is present, processing task(s) will be created by
-  // this call.
-  sl_system_init();
+/**************************************************************************//**
+ * Application Deinit.
+ *****************************************************************************/
+void app_deinit(void);
 
-  // Initialize the application. For example, create periodic timer(s) or
-  // task(s) if the kernel is present.
-  app_init(argc, argv);
+#ifdef __cplusplus
+};
+#endif
 
-  while (run) {
-    // Do not remove this call: Silicon Labs components process action routine
-    // must be called from the super loop.
-    sl_system_process_action();
-
-    // Application process.
-    app_process_action();
-  }
-
-  return EXIT_SUCCESS;
-}
+#endif // APP_H
