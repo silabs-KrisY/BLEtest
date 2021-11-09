@@ -4,6 +4,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.1.0] - 2021-11-09
+### Added
+- Prints DTM packet count in TX mode
+
+### Changed
+- More graceful exit on control-c during DTM test (prints packet counts)
+- Minor documentation cleanup edits
+- Fixes bug with DTM RX command line parameter (no longer requires argument)
+
 ## [2.0.0] - 2021-10-22
 ### Changed
 - Major updates to move to 3.x Bluetooth SDK API and project structure

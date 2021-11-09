@@ -42,6 +42,7 @@
 #include "sl_bt_api.h"
 #include <getopt.h>
 #include <sys/stat.h> //for umask
+#include <time.h>
 
 // Optstring argument for getopt.
 #define OPTSTRING      NCP_HOST_OPTSTRING APP_LOG_OPTSTRING "hv"
@@ -93,10 +94,10 @@
              {"power",      required_argument, 0,  LONG_OPT_POWER },
              {"channel",    required_argument, 0,  LONG_OPT_CHANNEL },
              {"len",        required_argument, 0,  LONG_OPT_LEN },
-             {"rx",         required_argument, 0,  LONG_OPT_RX },
+             {"rx",         no_argument,       0,  LONG_OPT_RX },
              {"ctune_set",  required_argument, 0,  LONG_OPT_CTUNE_SET },
              {"ctune_get",  no_argument,       0,  LONG_OPT_CTUNE_GET },
-             {"addr_set",   required_argument,       0,  LONG_OPT_ADDR_SET },
+             {"addr_set",   required_argument, 0,  LONG_OPT_ADDR_SET },
              {"fwver_get",  no_argument,       0,  LONG_OPT_FWVER },
              {"adv",        no_argument,       0,  LONG_OPT_ADV },
              {"cust",       required_argument, 0,  LONG_OPT_CUST },
@@ -126,6 +127,8 @@ uint16_t gattdb_session;
 #define DEFAULT_POWER_LEVEL		50	//5 dBm
 #define DEFAULT_PACKET_LENGTH	25
 #define CMP_LENGTH	2
+
+#define CANCEL_TIMEOUT_SECONDS 3 //quit after 3 seconds if no response
 
 /**
  * Configurable parameters that can be modified to match the test setup.
@@ -169,8 +172,10 @@ static enum ps_states {
 /* application state machine */
 static enum app_states {
 	adv_test,
-	dtm_begin,
-	dtm_receive_started,
+	dtm_rx_begin,
+  dtm_tx_begin,
+	dtm_rx_started,
+  dtm_tx_started,
 	default_state,
   verify_custom_bgapi
 } app_state =   default_state;
@@ -286,7 +291,7 @@ void app_init(int argc, char *argv[])
 
       case LONG_OPT_RX:
         /* DTM receive */
-        app_state = dtm_begin;
+        app_state = dtm_rx_begin;
         break;
 
       case LONG_OPT_CTUNE_SET:
@@ -353,7 +358,7 @@ void app_init(int argc, char *argv[])
         cust_bgapi_len = string_len/2;
         if (string_len > MAX_CUST_BGAPI_STRING_LEN)
         {
-          printf("String too long in -b argument: string length %lu, max = %d\n",strlen(optarg),MAX_CUST_BGAPI_STRING_LEN);
+          printf("String too long in -b argument: string length %zu, max = %d\n",strlen(optarg),MAX_CUST_BGAPI_STRING_LEN);
           exit(EXIT_FAILURE);
         }
 
@@ -433,12 +438,59 @@ void app_process_action(void)
  *****************************************************************************/
 void app_deinit(void)
 {
+  time_t start_time;
+  uint8_t exitwhile=false;
+  sl_status_t sc;
+  sl_bt_msg_t evt;
+
+  /* if DTM is in process, end it prior to closing */
+  if (app_state == dtm_rx_begin || app_state == dtm_tx_begin)
+  {
+    printf("Canceling DTM in progress...\n");
+    start_time = time(NULL);
+    sc = sl_bt_test_dtm_end();
+    app_assert_status(sc);
+    do {
+      sc = sl_bt_pop_event(&evt);
+
+      if (sc == SL_STATUS_OK) {
+        if (SL_BGAPI_MSG_ID(evt.header) == sl_bt_evt_test_dtm_completed_id) {
+          if (app_state == dtm_rx_begin) {
+            // Process dtm_completed thrown when started
+            app_state = dtm_rx_started;
+          } else if (app_state == dtm_tx_begin) {
+            // Process dtm_completed thrown when started
+            app_state = dtm_tx_started;
+          } else if (app_state == dtm_tx_started) {
+          printf("DTM completed, number of packets transmitted: %d\n",evt.data.evt_test_dtm_completed.number_of_packets);
+          exitwhile = true;
+        } else if (app_state == dtm_rx_started) {
+          printf("DTM completed, number of packets received: %d\n",evt.data.evt_test_dtm_completed.number_of_packets);
+          exitwhile = true;
+        } else {
+          printf("sl_bt_evt_test_dtm_completed_id with unknown app state\n");
+          exitwhile = true;
+        }
+        }
+      }
+
+      if ((time(NULL) - start_time) >= CANCEL_TIMEOUT_SECONDS) { //timeout in seconds
+        exitwhile = true;
+      }
+
+    } while (exitwhile == false);
+
+  }
+
   ncp_host_deinit();
 
   /////////////////////////////////////////////////////////////////////////////
   // Put your additional application deinit code here!                       //
   // This is called once during termination.                                 //
   /////////////////////////////////////////////////////////////////////////////
+
+  // Force exit here
+  exit(EXIT_SUCCESS);
 }
 
 /**************************************************************************//**
@@ -533,18 +585,23 @@ void sl_bt_on_event(sl_bt_msg_t *evt)
       break;
 
       case sl_bt_evt_test_dtm_completed_id:
-        if (app_state == dtm_begin) {
+        if (app_state == dtm_rx_begin) {
           //This is just an acknowledgement of the DTM start - set a flag for the next event which is the end
-          app_state = dtm_receive_started;
-        } else if (app_state == dtm_receive_started) {
+          app_state = dtm_rx_started;
+        } else if (app_state == dtm_tx_begin ) {
+          //This is just an acknowledgement of the DTM start - set a flag for the next event which is the end
+          app_state = dtm_tx_started;
+
+        } else if (app_state == dtm_rx_started) {
           //This is the event received at the end of the test
           printf("DTM receive completed. Number of packets received: %d\n",evt->data.evt_test_dtm_completed.number_of_packets);
           exit(EXIT_SUCCESS);	//test done - terminate
-        } else {
+        } else if (app_state == dtm_tx_started ) {
           /* Not sure how we got here - but exit anyways */
-          printf("Test completed!\n");
+          printf("DTM completed, number of packets transmitted: %d\n",evt->data.evt_test_dtm_completed.number_of_packets);
           exit(EXIT_SUCCESS); //test done - terminate
         }
+        break;
     // -------------------------------
     // Default event handler.
     default:
@@ -657,7 +714,7 @@ void main_app_handler(void) {
   		/* This is the FW revision string from the GATT - load it and print it as an ASCII string */
   		sc = sl_bt_gatt_server_read_attribute_value(attribute_handle,0,sizeof(rev_str), &rev_str_len, rev_str); //read from the beginning (offset 0)
       app_assert_status(sc);
-  		printf("FW Revision string (length = %lu): ",rev_str_len);
+  		printf("FW Revision string (length = %zu): ",rev_str_len);
   		for (i = 0; i < rev_str_len; i++)
   		{
   			printf("%c",rev_str[i]);
@@ -685,7 +742,7 @@ void main_app_handler(void) {
   	sl_bt_system_reset(sl_bt_system_boot_mode_normal);/* reset to take effect */
   	printf("Rebooting with new MAC address...\n");
   }
-  else if (app_state == dtm_begin)
+  else if (app_state == dtm_rx_begin)
   {
     printf("DTM receive enabled, freq=%d MHz, phy=0x%02X\n",2402+(2*channel), selected_phy);
     sc = sl_bt_test_dtm_rx(channel,selected_phy);
@@ -723,7 +780,7 @@ void main_app_handler(void) {
       /* Print returned payload */
       if (user_message_response_len != 0) {
         uint8_t i;
-        printf("BGAPI success! Returned payload (len=%lu): ",user_message_response_len);
+        printf("BGAPI success! Returned payload (len=%zu): ",user_message_response_len);
         for (i=0; i != user_message_response_len;i++) {
           printf("%02X ",user_message_response[i]);
         }
@@ -735,7 +792,8 @@ void main_app_handler(void) {
     }
   }
   else if (ps_state == ps_none) {
-  	printf("Outputting modulation type 0x%02X for %d ms at %d MHz at %.1f dBm, phy=0x%02X\n",
+    app_state = dtm_tx_begin;
+    printf("Outputting modulation type 0x%02X for %d ms at %d MHz at %.1f dBm, phy=0x%02X\n",
       packet_type, duration_usec/1000, 2402+(2*channel), (float)power_level/10,
       selected_phy);
   	/*Run test command */

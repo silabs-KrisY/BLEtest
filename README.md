@@ -1,8 +1,8 @@
 # BLEtest
 
-This an example application that demonstrates Bluetooth Low Energy (BLE) peripheral connectivity using BGLib C function definitions. It resets the device, then reads the MAC address and executes a test command. The functionality can be used for RF testing and manufacturing purposes.
+This an example application that demonstrates Bluetooth Low Energy (BLE) peripheral connectivity using BGLib C function definitions. It resets the device, then reads the MAC address and executes one or more test commands. The functionality can be used for RF testing and manufacturing verification purposes.
 
-This is targeted to run on a Linux/Cygwin host. The BLE NCP can be connected to any /dev/ttyx including hardware UARTs as well as USB virtual COM ports. This includes the WSTK development board (or Thunderboard) connected over USB (virtual COM) with an applicable NCP image programmed into the EFR32.
+This is targeted to run on a Posix/Linux/Cygwin host. The BLE NCP can be connected to any /dev/ttyx including hardware UARTs as well as USB virtual COM ports. This includes the Silicon Labs Wireless Starter Kit (WSTK) development board (or Silicon Labs Thunderboard) connected over USB (virtual COM) with an applicable NCP firmware image programmed into the EFR32.
 
 # Getting Started
 
@@ -10,8 +10,8 @@ These instructions will get you a copy of the project up and running on your loc
 
 ### Prerequisites
 
-1. Blue Gecko SDK version 3.x (installed via Simplicity Studio v5). *NOTE: This tool is no longer compatible with Blue Gecko SDK version 2.x. For 2.x compatibility, revert to previous 1.x versions of BLEtest.*
-2. Linux/Posix build environment (OSX, Cygwin, Raspberry Pi, etc.).
+1. Blue Gecko SDK version 3.x installed via Simplicity Studio v5. *NOTE: This tool is no longer compatible with Blue Gecko SDK version 2.x. For 2.x compatibility, revert to previous 1.x versions of BLEtest.*
+2. Linux/Posix build environment (OSX, Raspberry Pi, etc.) or Windows (Cygwin/MinGW).
 3. Blue Gecko / Mighty Gecko device running a serial UART NCP (Network Co-Processor) firmware image. See the "To Run" section below for more details.
 
 ### Installing
@@ -60,7 +60,7 @@ $ unzip ble_3p2.zip -d ble_3p2
 
 1. Program your NCP firmware image (using either the "Bluetooth - NCP Empty" or "Bluetooth - NCP" example projects) into your target board. Instructions on how to implement this, both on custom hardware and on Silicon Labs wireless starter kit (WSTK) radio boards are provided in [AN1259: Using the v3.x Silicon Labs Bluetooth(R) Stack in Network Co-Processor Mode](https://www.silabs.com/documents/login/application-notes/an1259-bt-ncp-mode-sdk-v3x.pdf).
 2. Connect your device running the Bluetooth NCP firmware to the host (via USB, uart, etc.).
-3. Run the host application, pointing it to the correct serial port. Note that the default serial port created when plugging a WSTK or Silicon Labs Thunderboard into a Raspberry Pi is "/dev/ttyACM0". The command line usage is:
+3. Run the host application, pointing it to the correct serial port. Note that the default serial port created when plugging a Silicon Labs WSTK or Silicon Labs Thunderboard into a Raspberry Pi is "/dev/ttyACM0". The command line usage is:
 ```
 BLEtest -u <serial port>
 ```
@@ -100,7 +100,7 @@ Waiting for boot pkt...
 boot pkt rcvd: gecko_evt_system_boot(3, 2, 2, 267, 0x 1090002, 1)
 MAC address: 00:0D:6F:20:B2:D6
 Outputting modulation type 0xFE for 1000 ms at 2402 MHz at 5.0 dBm, phy=0x01
-Test completed!
+DTM completed, number of packets transmitted: 0
 ```
 
 Examples:
@@ -115,7 +115,7 @@ Waiting for boot pkt...
 boot pkt rcvd: gecko_evt_system_boot(3, 2, 2, 267, 0x 1090002, 1)
 MAC address: 00:0D:6F:20:B2:D6
 Outputting modulation type 0xFE for 10000 ms at 2402 MHz at 5.0 dBm, phy=0x01
-Test completed!
+DTM completed, number of packets transmitted: 0
 ```
 
 2. Transmit DTM (direct test mode) packets containing a pseudorandom PRBS9 payload of length=25 for 10 seconds on 2404 MHz at 8dBm output power level on device connected to serial port /dev/ttyACM0
@@ -125,10 +125,10 @@ $ ./exe/BLEtest --time 10000 --packet_type 0 --power 80 -u /dev/ttyACM0 --channe
 ------------------------
 Waiting for boot pkt...
 
-boot pkt rcvd: gecko_evt_system_boot(3, 2, 2, 267, 0x 1090002, 1)
-MAC address: 00:0D:6F:20:B2:D6
-Outputting modulation type 0 for 10000 ms at 2404 MHz at 8.0 dBm, phy=0x01
-Test completed!
+boot pkt rcvd: gecko_evt_system_boot(3, 2, 4, 297, 0x 1090002, 1)
+MAC address: 00:0D:6F:08:62:3F
+Outputting modulation type 0x00 for 10000 ms at 2404 MHz at 8.0 dBm, phy=0x01
+DTM completed, number of packets transmitted: 16014
 ```
 
 3. Receive DTM (direct test mode) packets for 10 seconds on 2404 MHz on device connected to serial port /dev/ttyACM0. Note that the printout below shows an example of 100% packet reception rate when running example 2 (TX with PRBS9 DTM length=25) on a separate device.
@@ -151,14 +151,15 @@ $ ./exe/BLEtest -u /dev/ttyACM0 --addr_set 01:02:03:04:05:06
 ------------------------
 Waiting for boot pkt...
 
-boot pkt rcvd: gecko_evt_system_boot(3, 2, 2, 267, 0x 1090002, 1)
-MAC address: 00:0D:6F:20:B2:D6
+boot pkt rcvd: gecko_evt_system_boot(3, 2, 4, 297, 0x 1090002, 1)
+MAC address: 00:0D:6F:08:62:3F
 Writing MAC address: 01:02:03:04:05:06
 Rebooting with new MAC address...
-boot pkt rcvd: gecko_evt_system_boot(3, 2, 2, 267, 0x 1090002, 1)
+
+boot pkt rcvd: gecko_evt_system_boot(3, 2, 4, 297, 0x 1090002, 1)
 MAC address: 01:02:03:04:05:06
-Outputting modulation type 0 for 1000 ms at 2402 MHz at 5.0 dBm, phy=0x01
-Test completed!
+Outputting modulation type 0xFE for 1000 ms at 2402 MHz at 5.0 dBm, phy=0x01
+DTM completed, number of packets transmitted: 0
 ```
 
 5. Write crystal tuning value of 0x0155 to device connected to virtual COM port /dev/ttyACM0 and output test tone of 2402 MHz at 5.0 dBm for 10 seconds to verify frequency using a spectrum analyzer (set the instrument to 500 kHz bandwidth).
@@ -174,11 +175,11 @@ Writing ctune value to 0x0155
 Rebooting with new ctune value...
 boot pkt rcvd: gecko_evt_system_boot(3, 2, 2, 267, 0x 1090002, 1)
 MAC address: 00:0D:6F:20:B2:D6
-Outputting modulation type 254 for 10000 ms at 2402 MHz at 5.0 dBm, phy=0x01
-Test completed!
+Outputting modulation type 0xFE for 10000 ms at 2402 MHz at 5.0 dBm, phy=0x01
+DTM completed, number of packets transmitted: 0
 ```
 
-6. Send custom BGAPI payload "0x01" and print response payload. In our NCP example projects, custom BGAPI handlers for commands "0x01" and "0x02" are implemented as examples and just echo back the command in the response payload.
+6. Send custom BGAPI payload "0x01" and print response payload. In our NCP example projects, custom BGAPI handlers for commands "0x01" and "0x02" are implemented as an example with functionality implemented to echo back the command in the response payload.
 ```
 $ ./exe/BLEtest -u /dev/ttyACM0 --cust 01
 
