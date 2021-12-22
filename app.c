@@ -111,7 +111,7 @@ static uint8_t advertising_set_handle = 0xff;
 uint16_t gattdb_session;
 
 #define VERSION_MAJ	2u
-#define VERSION_MIN	0u
+#define VERSION_MIN	2u
 
 #define TRUE   1u
 #define FALSE  0u
@@ -619,7 +619,14 @@ static void initialize_gatt_database(void)
 
   // New session
   sc = sl_bt_gattdb_new_session(&gattdb_session);
-  app_assert_status(sc);
+
+  if (sc == SL_STATUS_NOT_SUPPORTED) {
+    /* If dynamic GATT is not supported, just ignore for now */
+    app_log_debug("warning: NCP firmware does not support dynamic GATT\r\n");
+    return;
+  } else {
+    app_assert_status(sc);
+  }
 
   // Add services
   for (service_index_t i = (service_index_t)0; i < SERVICES_COUNT; i++) {
