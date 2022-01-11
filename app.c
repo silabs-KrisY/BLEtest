@@ -111,7 +111,7 @@ static uint8_t advertising_set_handle = 0xff;
 uint16_t gattdb_session;
 
 #define VERSION_MAJ	2u
-#define VERSION_MIN	2u
+#define VERSION_MIN	3u
 
 #define TRUE   1u
 #define FALSE  0u
@@ -155,6 +155,9 @@ static uint8_t selected_phy=DEFAULT_PHY;
 /* advertising test mode */
 #define TEST_ADV_INTERVAL_MS 50
 #define ADV_INTERVAL_UNIT 0.625 //per API guide
+
+#define MAX_POWER_LEVEL 200 //deci-dBm
+#define MIN_POWER_LEVEL -100 //deci-dBm
 
 static uint8_t adv_data[] = {0x02, 0x01, 0x06, 0x03, 0x03, 0x02, 0x18}; //LE general discoverable, FIND ME service (0x1802)
 /* 20 byte length, 0x09 (full name), "Blue Gecko Test App" */
@@ -504,6 +507,7 @@ void sl_bt_on_event(sl_bt_msg_t *evt)
   sl_status_t sc;
   bd_addr address;
   uint8_t address_type;
+  int16_t power_level_set_min, power_level_set_max;
 
   switch (SL_BT_MSG_ID(evt->header)) {
     // -------------------------------
@@ -531,6 +535,11 @@ void sl_bt_on_event(sl_bt_msg_t *evt)
         address.addr[2],
 				address.addr[1],
 				address.addr[0]);
+
+      // Set power limits to max (note - max will generally be internally
+      // limited to 10 dBm)
+      sc = sl_bt_system_set_tx_power(MIN_POWER_LEVEL, MAX_POWER_LEVEL, &power_level_set_min, &power_level_set_max);
+      app_assert_status(sc);
 
       // Initialize GATT database dynamically.
       initialize_gatt_database();
@@ -803,8 +812,17 @@ void main_app_handler(void) {
     printf("Outputting modulation type 0x%02X for %d ms at %d MHz at %.1f dBm, phy=0x%02X\n",
       packet_type, duration_usec/1000, 2402+(2*channel), (float)power_level/10,
       selected_phy);
-  	/*Run test command */
-  	sc = sl_bt_test_dtm_tx_v4(packet_type,packet_length,channel,selected_phy, power_level);
+    /* Run test command using test_dtm_tx_v4 (GSDK v3.2 compatibility) */
+    if (packet_type != sl_bt_test_pkt_carrier) {
+      // units of dBm for packet commands using v4 cmd
+      sc = sl_bt_test_dtm_tx_v4(packet_type,packet_length,channel,selected_phy,
+        (int8_t) power_level/10);
+    } else {
+      // units of dec-dBm for unmodulated carrier using v4 cmd
+      sc = sl_bt_test_dtm_tx_v4(packet_type,packet_length,channel,selected_phy,
+        (int8_t) power_level);
+    }
+
     if (sc)
     {
       printf("Error running DTM TX command, result=0x%02X\n",sc);

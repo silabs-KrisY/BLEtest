@@ -4,6 +4,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.3.0] - 2022-1-11
+### Fixed
+- Works around issue with sl_bt_test_dtm_tx_v4() where continuously modulated TX is in deci-dBm while packet TX is in dBm
+- Sets power limit with sl_bt_system_set_tx_power() to be able to achieve 10 dBm on DTM packet TX
+- Bumped version to 2.3
+
+### Known Issue
+- Continuously modulated TX limited to 12.7 dBm. Resolved with new API in GSDK 3.2, will require new BLEtest.
+
+## [2.2.0] - 2021-12-22
+### Changed
+- Ignores dynamic gatt not supported error if dynamic GATT not implemented on the NCP.
+- Bumped version to 2.2 (forgot to bump for 2.1).
+
 ## [2.1.0] - 2021-11-09
 ### Added
 - Prints DTM packet count in TX mode
