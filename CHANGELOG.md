@@ -6,7 +6,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [2.3.0] - 2022-1-11
 ### Fixed
-- Works around issue with sl_bt_test_dtm_tx_v4() where continuously modulated TX is in deci-dBm while packet TX is in dBm
+- Works around issue with sl_bt_test_dtm_tx_v4() where continuously modulated/unmodulated TX is in deci-dBm while packet TX is in dBm
 - Sets power limit with sl_bt_system_set_tx_power() to be able to achieve 10 dBm on DTM packet TX
 - Bumped version to 2.3
 

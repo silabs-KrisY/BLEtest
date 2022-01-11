@@ -813,12 +813,12 @@ void main_app_handler(void) {
       packet_type, duration_usec/1000, 2402+(2*channel), (float)power_level/10,
       selected_phy);
     /* Run test command using test_dtm_tx_v4 (GSDK v3.2 compatibility) */
-    if (packet_type != sl_bt_test_pkt_carrier) {
+    if ((packet_type != sl_bt_test_pkt_carrier) && (packet_type != sl_bt_test_pkt_pn9)) {
       // units of dBm for packet commands using v4 cmd
       sc = sl_bt_test_dtm_tx_v4(packet_type,packet_length,channel,selected_phy,
         (int8_t) power_level/10);
     } else {
-      // units of dec-dBm for unmodulated carrier using v4 cmd
+      // units of dec-dBm for unmodulated/PN9 modulated carrier using v4 cmd
       sc = sl_bt_test_dtm_tx_v4(packet_type,packet_length,channel,selected_phy,
         (int8_t) power_level);
     }
