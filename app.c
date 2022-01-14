@@ -111,7 +111,7 @@ static uint8_t advertising_set_handle = 0xff;
 uint16_t gattdb_session;
 
 #define VERSION_MAJ	2u
-#define VERSION_MIN	3u
+#define VERSION_MIN	4u
 
 #define TRUE   1u
 #define FALSE  0u
@@ -816,7 +816,7 @@ void main_app_handler(void) {
     if ((packet_type != sl_bt_test_pkt_carrier) && (packet_type != sl_bt_test_pkt_pn9)) {
       // units of dBm for packet commands using v4 cmd
       sc = sl_bt_test_dtm_tx_v4(packet_type,packet_length,channel,selected_phy,
-        (int8_t) power_level/10);
+        (int8_t) (power_level/10));
     } else {
       // units of dec-dBm for unmodulated/PN9 modulated carrier using v4 cmd
       sc = sl_bt_test_dtm_tx_v4(packet_type,packet_length,channel,selected_phy,

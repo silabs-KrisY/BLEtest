@@ -4,6 +4,10 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.4.0] - 2022-1-14
+### Fixed
+- Fixes issue with power level parameter for DTM packet testing
+
 ## [2.3.0] - 2022-1-11
 ### Fixed
 - Works around issue with sl_bt_test_dtm_tx_v4() where continuously modulated/unmodulated TX is in deci-dBm while packet TX is in dBm
