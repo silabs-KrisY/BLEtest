@@ -48,7 +48,8 @@
 #define OPTSTRING      NCP_HOST_OPTSTRING APP_LOG_OPTSTRING "hv"
 
 // Usage info.
-#define USAGE          APP_LOG_NL "%s " NCP_HOST_USAGE APP_LOG_USAGE " [-h]" APP_LOG_NL
+#define USAGE          APP_LOG_NL "%s " NCP_HOST_USAGE APP_LOG_USAGE " [-h]" \
+                        APP_LOG_NL OPTIONS
 
 // Options info.
 #define OPTIONS    \
@@ -57,7 +58,7 @@
   APP_LOG_OPTIONS  \
   "   -h                Print this help message.\n" \
   "   --version         Print the software version defined in the application.\n" \
-  "   --time <duration of test in milliseconds>\n" \
+  "   --time <duration of test in milliseconds>, 0 for infinite mode (exit with control-c)\n" \
   "   --packet_type <payload/modulation type, 0:PBRS9, 1:11110000 packet payload, 2:10101010 packet payload, 253:PN9 continuously modulated, 254:unmodulated carrier>\n" \
   "   --power <power level in 0.1dBm steps>\n" \
   "   --channel <channel, 2402 MHz + 2*channel>\n" \
@@ -111,7 +112,7 @@ static uint8_t advertising_set_handle = 0xff;
 uint16_t gattdb_session;
 
 #define VERSION_MAJ	2u
-#define VERSION_MIN	4u
+#define VERSION_MIN	5u
 
 #define TRUE   1u
 #define FALSE  0u
@@ -165,21 +166,21 @@ static uint8_t scan_rsp_data[] = {20,0x09,0x42,0x6c,0x75,0x65,0x20,0x47,0x65,0x6
 
 /* flash write state machine */
 static enum ps_states {
-	ps_none,
-	ps_write_mac,
-	ps_write_ctune,
-	ps_read_ctune,
-	ps_read_gatt_fwversion //note that this isn't really a PS command, but we'll leave it here
+  ps_none,
+  ps_write_mac,
+  ps_write_ctune,
+  ps_read_ctune,
+  ps_read_gatt_fwversion //note that this isn't really a PS command, but we'll leave it here
 } ps_state = ps_none;
 
 /* application state machine */
 static enum app_states {
-	adv_test,
-	dtm_rx_begin,
+  adv_test,
+  dtm_rx_begin,
   dtm_tx_begin,
-	dtm_rx_started,
+  dtm_rx_started,
   dtm_tx_started,
-	default_state,
+  default_state,
   verify_custom_bgapi
 } app_state =   default_state;
 
@@ -203,6 +204,7 @@ static size_t ctune_ret_len;
 /* Store NCP version information */
 static uint8_t version_major;
 static uint8_t version_minor;
+static uint8_t version_patch;
 
 //static void print_usage(void);
 
@@ -413,7 +415,7 @@ void app_init(int argc, char *argv[])
   app_assert_status(sc);
 
   printf("\n------------------------\n");
-	printf("Waiting for boot pkt...\n");
+  printf("Waiting for boot pkt...\n");
   // Reset NCP to ensure it gets into a defined state.
   // Once the chip successfully boots, boot event should be received.
   sl_bt_system_reset(sl_bt_system_boot_mode_normal);
@@ -517,11 +519,12 @@ void sl_bt_on_event(sl_bt_msg_t *evt)
       /* Store version info */
       version_major = evt->data.evt_system_boot.major;
       version_minor = evt->data.evt_system_boot.minor;
+      version_patch = evt->data.evt_system_boot.patch;
       // Print boot message.
       printf("\nboot pkt rcvd: gecko_evt_system_boot(%d, %d, %d, %d, 0x%8x, %d)\n",
                version_major,
                version_minor,
-               evt->data.evt_system_boot.patch,
+               version_patch,
                evt->data.evt_system_boot.build,
                evt->data.evt_system_boot.bootloader,
                evt->data.evt_system_boot.hw);
@@ -529,12 +532,12 @@ void sl_bt_on_event(sl_bt_msg_t *evt)
       sc = sl_bt_system_get_identity_address(&address, &address_type);
       app_assert_status(sc);
       printf("MAC address: %02X:%02X:%02X:%02X:%02X:%02X\n",
-				address.addr[5], // <-- address is little-endian
-				address.addr[4],
-				address.addr[3],
+        address.addr[5], // <-- address is little-endian
+        address.addr[4],
+        address.addr[3],
         address.addr[2],
-				address.addr[1],
-				address.addr[0]);
+        address.addr[1],
+        address.addr[0]);
 
       // Set power limits to max (note - max will generally be internally
       // limited to 10 dBm)
@@ -676,8 +679,8 @@ void main_app_handler(void) {
   uint8_t user_message_response[50];
 
   /* Immediately exit if not the right NCP version */
-  if (version_major < 3) {
-    printf("ERROR: This software requires Blue Gecko NCP version 3.0 or higher!\n");
+  if ((version_major < 3) || ((version_major == 3) && (version_minor < 3) && (version_patch < 1))) {
+    printf("ERROR: This software version requires Blue Gecko NCP version 3.3.1 or higher!\n");
     exit(EXIT_FAILURE);
   }
 
@@ -688,75 +691,75 @@ void main_app_handler(void) {
   } else if (sc) {
     app_assert_status(sc);
   }
-	/* Run test commands */
-	/* deal with flash writes first, since reboot is needed to take effect */
+  /* Run test commands */
+  /* deal with flash writes first, since reboot is needed to take effect */
   if(ps_state == ps_write_ctune) {
-  	/* Write ctune value and reboot */
-  	printf("Writing ctune value to 0x%04x\n", ctune_value);
+    /* Write ctune value and reboot */
+    printf("Writing ctune value to 0x%04x\n", ctune_value);
     sc = sl_bt_nvm_save(SL_BT_NVM_KEY_CTUNE, sizeof(ctune_array), ctune_array);
     app_assert_status(sc);
-  	ps_state = ps_none; /* reset state machine */
-  	sl_bt_system_reset(sl_bt_system_boot_mode_normal);/* reset to take effect */
-  	printf("Rebooting with new ctune value...\n");
+    ps_state = ps_none; /* reset state machine */
+    sl_bt_system_reset(sl_bt_system_boot_mode_normal);/* reset to take effect */
+    printf("Rebooting with new ctune value...\n");
   } else if (ps_state == ps_read_ctune)
   {
-  	/* read the NVM3 key for CTUNE */
-  	printf("Reading flash NVM3 value for CTUNE\n");
+    /* read the NVM3 key for CTUNE */
+    printf("Reading flash NVM3 value for CTUNE\n");
     sc = sl_bt_nvm_load(SL_BT_NVM_KEY_CTUNE, sizeof(ctune_array), &ctune_ret_len, ctune_array);
-  	if (sc == SL_STATUS_BT_PS_KEY_NOT_FOUND ) {
+    if (sc == SL_STATUS_BT_PS_KEY_NOT_FOUND ) {
       printf("CTUNE value not loaded in PS flash!\n");
     } else if (sc) {
       app_assert_status(sc);
     }
-  	else {
-  		printf("Stored CTUNE = 0x%04x\nRebooting...\n", (uint16_t)(ctune_array[0] | ctune_array[1] << 8));
-  	}
-  		/* Reset again and proceed with other commands */
-  		ps_state = ps_none; /* reset state machine */
-  		sl_bt_system_reset(sl_bt_system_boot_mode_normal);/* reset to take effect */
+    else {
+      printf("Stored CTUNE = 0x%04x\nRebooting...\n", (uint16_t)(ctune_array[0] | ctune_array[1] << 8));
+    }
+      /* Reset again and proceed with other commands */
+      ps_state = ps_none; /* reset state machine */
+      sl_bt_system_reset(sl_bt_system_boot_mode_normal);/* reset to take effect */
 
   } else if (ps_state == ps_read_gatt_fwversion)
   {
-  	/* Find the firmware revision string (UUID 0x2a26) in the local GATT and print it out */
-  	sc = sl_bt_gatt_server_find_attribute(0,FWREV_TYPE_LEN,fwrev_type_data, &attribute_handle);
-  	if (sc == SL_STATUS_BT_ATT_ATT_NOT_FOUND) {
-  			printf("Firmware revision string not found in the local GATT.\nRebooting...\n");
-  	} else if (sc)
+    /* Find the firmware revision string (UUID 0x2a26) in the local GATT and print it out */
+    sc = sl_bt_gatt_server_find_attribute(0,FWREV_TYPE_LEN,fwrev_type_data, &attribute_handle);
+    if (sc == SL_STATUS_BT_ATT_ATT_NOT_FOUND) {
+        printf("Firmware revision string not found in the local GATT.\nRebooting...\n");
+    } else if (sc)
     {
       app_assert_status(sc);
     } else {
-  		printf("Found firmware revision string at handle %d\n",attribute_handle);
+      printf("Found firmware revision string at handle %d\n",attribute_handle);
 
-  		/* This is the FW revision string from the GATT - load it and print it as an ASCII string */
-  		sc = sl_bt_gatt_server_read_attribute_value(attribute_handle,0,sizeof(rev_str), &rev_str_len, rev_str); //read from the beginning (offset 0)
+      /* This is the FW revision string from the GATT - load it and print it as an ASCII string */
+      sc = sl_bt_gatt_server_read_attribute_value(attribute_handle,0,sizeof(rev_str), &rev_str_len, rev_str); //read from the beginning (offset 0)
       app_assert_status(sc);
-  		printf("FW Revision string (length = %zu): ",rev_str_len);
-  		for (i = 0; i < rev_str_len; i++)
-  		{
-  			printf("%c",rev_str[i]);
-  		}
-  		printf("\n");
-  	}
+      printf("FW Revision string (length = %zu): ",rev_str_len);
+      for (i = 0; i < rev_str_len; i++)
+      {
+        printf("%c",rev_str[i]);
+      }
+      printf("\n");
+    }
 
-  	/* Reset again and proceed with other commands (not flash commands)*/
-  	ps_state = ps_none; /* reset state machine */
-  	sl_bt_system_reset(sl_bt_system_boot_mode_normal);/* reset to take effect */
+    /* Reset again and proceed with other commands (not flash commands)*/
+    ps_state = ps_none; /* reset state machine */
+    sl_bt_system_reset(sl_bt_system_boot_mode_normal);/* reset to take effect */
   }
   else if (ps_state == ps_write_mac) {
-  	/* write MAC value and reboot */
-  	printf("Writing MAC address: %02X:%02X:%02X:%02X:%02X:%02X\n",
-  	new_address.addr[5], // <-- address is little-endian
-  	new_address.addr[4],
-  	new_address.addr[3],
-  	new_address.addr[2],
-  	new_address.addr[1],
-  	new_address.addr[0]
-  	);
+    /* write MAC value and reboot */
+    printf("Writing MAC address: %02X:%02X:%02X:%02X:%02X:%02X\n",
+    new_address.addr[5], // <-- address is little-endian
+    new_address.addr[4],
+    new_address.addr[3],
+    new_address.addr[2],
+    new_address.addr[1],
+    new_address.addr[0]
+    );
     sc = sl_bt_system_set_identity_address(new_address, 0); //set public address
-  	app_assert_status(sc);
-  	ps_state = ps_none; /* reset state machine */
-  	sl_bt_system_reset(sl_bt_system_boot_mode_normal);/* reset to take effect */
-  	printf("Rebooting with new MAC address...\n");
+    app_assert_status(sc);
+    ps_state = ps_none; /* reset state machine */
+    sl_bt_system_reset(sl_bt_system_boot_mode_normal);/* reset to take effect */
+    printf("Rebooting with new MAC address...\n");
   }
   else if (app_state == dtm_rx_begin)
   {
@@ -769,12 +772,12 @@ void main_app_handler(void) {
   }
   else if (app_state == adv_test)
   {
-  	/* begin advertisement test */
-  	printf("\n--> Starting fast advertisements for testing\n");
-  	sc = sl_bt_system_set_tx_power(power_level, power_level, &power_level_set_min, &power_level_set_max);
-  	printf("Attempted power setting of %.1f dBm, actual setting %.1f dBm\n",(float)power_level/10,(float)power_level_set_max/10);
-  	printf("Press 'control-c' to end...\n");
-  	sc = sl_bt_advertiser_create_set(&advertising_set_handle);
+    /* begin advertisement test */
+    printf("\n--> Starting fast advertisements for testing\n");
+    sc = sl_bt_system_set_tx_power(power_level, power_level, &power_level_set_min, &power_level_set_max);
+    printf("Attempted power setting of %.1f dBm, actual setting %.1f dBm\n",(float)power_level/10,(float)power_level_set_max/10);
+    printf("Press 'control-c' to end...\n");
+    sc = sl_bt_advertiser_create_set(&advertising_set_handle);
     app_assert_status(sc);
     sc = sl_bt_advertiser_set_data(advertising_set_handle, 0, sizeof(adv_data),adv_data); //advertising data
     sc = sl_bt_advertiser_set_data(advertising_set_handle, 1, sizeof(scan_rsp_data), scan_rsp_data); //scan response data
@@ -812,15 +815,20 @@ void main_app_handler(void) {
     printf("Outputting modulation type 0x%02X for %d ms at %d MHz at %.1f dBm, phy=0x%02X\n",
       packet_type, duration_usec/1000, 2402+(2*channel), (float)power_level/10,
       selected_phy);
-    /* Run test command using test_dtm_tx_v4 (GSDK v3.2 compatibility) */
+    if (duration_usec == 0) {
+      printf("Infinite mode. Press control-c to exit...\r\n");
+    }
+    /* Run test command using test_dtm_tx_v4 */
     if ((packet_type != sl_bt_test_pkt_carrier) && (packet_type != sl_bt_test_pkt_pn9)) {
       // units of dBm for packet commands using v4 cmd
       sc = sl_bt_test_dtm_tx_v4(packet_type,packet_length,channel,selected_phy,
         (int8_t) (power_level/10));
     } else {
-      // units of dec-dBm for unmodulated/PN9 modulated carrier using v4 cmd
-      sc = sl_bt_test_dtm_tx_v4(packet_type,packet_length,channel,selected_phy,
-        (int8_t) power_level);
+      // units of deci-dBm for unmodulated/PN9 modulated carrier using
+      // sl_bt_test_dtm_tx_cw() API available in BLE SDK v3.3 (with output
+      // bug fixed in v3.3.1)
+      sc = sl_bt_test_dtm_tx_cw(packet_type,channel,selected_phy,
+        power_level);
     }
 
     if (sc)
@@ -828,8 +836,16 @@ void main_app_handler(void) {
       printf("Error running DTM TX command, result=0x%02X\n",sc);
       exit(EXIT_FAILURE);
     }
-  	usleep(duration_usec);	/* sleep during test */
-  	sc = sl_bt_test_dtm_end();
+    if (duration_usec != 0) {
+      usleep(duration_usec);	/* sleep during test */
+    } else {
+      while(1) {
+        // Infinte mode
+        // wait here for control-c, sleeping periodically
+        usleep(1000);
+      }
+    }
+    sc = sl_bt_test_dtm_end();
     app_assert_status(sc);
   }
 }

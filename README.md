@@ -10,20 +10,20 @@ These instructions will get you a copy of the project up and running on your loc
 
 ### Prerequisites
 
-1. Blue Gecko SDK version 3.x installed via Simplicity Studio v5. *NOTE: This tool is no longer compatible with Blue Gecko SDK version 2.x. For 2.x compatibility, revert to previous 1.x versions of BLEtest.*
+1. Blue Gecko SDK version v3.3.1 (Gecko SDK 4.0.1) or greater installed via Simplicity Studio v5 or from github. *NOTE: This tool is no longer compatible with Blue Gecko SDK version 2.x. For 2.x compatibility, revert to previous 1.x versions of BLEtest.*
 2. Linux/Posix build environment (OSX, Raspberry Pi, etc.) or Windows (Cygwin/MinGW).
-3. Blue Gecko / Mighty Gecko device running a serial UART NCP (Network Co-Processor) firmware image. See the "To Run" section below for more details.
+3. Blue Gecko / Mighty Gecko device running a serial UART NCP (Network Co-Processor) firmware image v3.3.1 (Gecko SDK 4.0.1) or greater. See the "To Run" section below for more details.
 
 ### Installing
 
 This project can be built as supplied within the Blue Gecko SDK frameworks.
 
-#### For Cygwin/OSX/Linux with SDK installed
+#### For Cygwin/OSX/Linux with Gecko SDK installed
 
-Clone or copy the contents of this repository into the Blue Gecko SDK, into a subfolder of app/bluetooth/example_host. Commands shown here are from OSX using Gecko SDK Suite v3.2, but will be similar in Linux/Cygwin.
+Clone or copy the contents of this repository into the Gecko SDK, into a subfolder of app/bluetooth/example_host. Commands shown here are from OSX using Gecko SDK Suite v3.3, but will be similar in Linux/Cygwin.
 
 ```
-$ cd /Applications/Simplicity Studio.app/Contents/Eclipse/developer/sdks/gecko_sdk_suite/v3.2/app/bluetooth/example_host/
+$ cd ~/SimplicityStudio/SDKs/gecko_sdk/app/bluetooth/example_host/
 $ git clone https://github.com/kryoung-silabs/BLEtest.git
 $ cd BLEtest
 $ make
@@ -31,31 +31,21 @@ $ make
 
 #### For Raspberry Pi
 
-1. On the PC with the SDK installed, create a compressed file archive containing the required SDK source files (command line example here on OS X using Gecko SDK Suite v3.2).
+1. Clone Gecko SDK (4.0.1 or higher) to the Raspberry Pi.
 
 ```
-$ cd Applications/Simplicity Studio.app/Contents/Eclipse/developer/sdks/gecko_sdk_suite/v3.2
-$ tar -cvf ble_3p2.tgz "app/bluetooth/component_host" "app/bluetooth/common_host" "platform/common/inc" "protocol/bluetooth/inc" "protocol/bluetooth/src" "app/common/util/app_log" "app/common/util/app_assert"
+$ git clone https://github.com/SiliconLabs/gecko_sdk.git
 ```
 
-You can also create a zip archive including the same files/paths using your favorite Windows Zip tool (7zip, etc.). Make sure you preserve paths relative to the Gecko SDK root when creating the archive!
-
-2. Transfer archive to Raspberry Pi, extract, clone, cd to the new directory, and make. Note that the SDK root directory can be specified on the make command line via the SDK_DIR parameter.
-
+2. Clone BLEtest to the Raspberry Pi:
 ```
-$ mkdir ble_3p2
-$ tar -xvf ble_3p2.tgz
 $ git clone https://github.com/kryoung-silabs/BLEtest.git
+```
+2. Cd to the BLEtest folder and invoke make, specifying the SDK root directory via the SDK_DIR parameter.
+```
 $ cd BLEtest
-$ make SDK_DIR=..
+$ make SDK_DIR=../gecko_sdk
 ```
-
-If using a zip archive with preserved paths relative to the Gecko SDK root, the extraction process is as follows:
-```
-$ mkdir ble_3p2
-$ unzip ble_3p2.zip -d ble_3p2
-```
-
 #### To Run
 
 1. Program your NCP firmware image (using either the "Bluetooth - NCP Empty" or "Bluetooth - NCP" example projects) into your target board. Instructions on how to implement this, both on custom hardware and on Silicon Labs wireless starter kit (WSTK) radio boards are provided in [AN1259: Using the v3.x Silicon Labs Bluetooth(R) Stack in Network Co-Processor Mode](https://www.silabs.com/documents/public/application-notes/an1259-bt-ncp-mode-sdk-v3x.pdf).
@@ -73,7 +63,7 @@ Arguments:
 -b <baud_rate, default 115200>
 -f          Enable hardware flow control
 --version   Print version number defined in application.
---time <duration of test in milliseconds>
+--time <duration of test in milliseconds>, 0 for infinite mode (exit with control-c)
 --packet_type <payload/modulation type, 0:PBRS9, 1:11110000 packet payload, 2:10101010 packet payload, 253:PN9 continuously modulated, 254:unmodulated carrier>
 --power <power level in 0.1dBm steps>
 --channel <channel, 2402 MHz + 2*channel>

@@ -4,6 +4,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.5.0] - 2022-05-11
+### Added
+- Adds support for "infinte mode" when --time argument is zero. Infinite mode continuously transmits or receives until stopped by control-C.
+
+### Fixed
+- Fixes issue with power level parameter for continuously modulated TX by using new API available in Bluetooth SDK v3.3 (note 20 dBm continuously modulated TX not enabled until fix in Bluetooth SDK v3.3.1)
+- Fixes help text display issue with "-h"
+
+### Changed
+- Enforces NCP compatibility of Bluetooth SDK v3.3.1 or higher
+
 ## [2.4.0] - 2022-1-14
 ### Fixed
 - Fixes issue with power level parameter for DTM packet testing
