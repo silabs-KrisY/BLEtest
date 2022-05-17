@@ -43,6 +43,9 @@
 #include <getopt.h>
 #include <sys/stat.h> //for umask
 #include <time.h>
+#include <inttypes.h>
+#include <stdint.h>
+#include <assert.h>
 
 // Optstring argument for getopt.
 #define OPTSTRING      NCP_HOST_OPTSTRING APP_LOG_OPTSTRING "hv"
@@ -70,7 +73,10 @@
   "   --fwver_get       Read FW revision string from Device Information (GATT)\n" \
   "   --adv             Enter a fast advertisement mode with scan response for TIS/TRP chamber testing\n" \
   "   --cust <ASCII hex command string> Allows verification/running custom BGAPI commands.\n" \
-  "   --phy <PHY selection for test packets/waveforms/RX mode, 1:1Mbps, 2:2Mbps, 3:125k LR coded, 4:500k LR coded.>\n"
+  "   --phy <PHY selection for test packets/waveforms/RX mode, 1:1Mbps, 2:2Mbps, 3:125k LR coded, 4:500k LR coded.>\n" \
+  "   --advscan         Return RSSI, LENGTH, and MAC address for advertisement scan results\n" \
+  "   --advscan=<optional MAC address for filtering, e.g. 01:02:03:04:05:06>\n" \
+  "   --rssi_avg <number of packets to include in RSSI average reports for advscan>\n"
 
   #define LONG_OPT_VERSION 0
   #define LONG_OPT_TIME 1
@@ -87,6 +93,8 @@
   #define LONG_OPT_DAEMON 12
   #define LONG_OPT_CUST 13
   #define LONG_OPT_PHY 14
+  #define LONG_OPT_ADVSCAN 15u
+  #define LONG_OPT_RSSI_AVG 16u
 
   static struct option long_options[] = {
              {"version",    no_argument,       0,  LONG_OPT_VERSION },
@@ -103,6 +111,8 @@
              {"adv",        no_argument,       0,  LONG_OPT_ADV },
              {"cust",       required_argument, 0,  LONG_OPT_CUST },
              {"phy",        required_argument, 0,  LONG_OPT_PHY },
+             {"advscan",    optional_argument, 0,  LONG_OPT_ADVSCAN },
+             {"rssi_avg",  required_argument, 0,  LONG_OPT_RSSI_AVG },
              {0,           0,                 0,  0  }};
 
 // The advertising set handle allocated from Bluetooth stack.
@@ -112,7 +122,7 @@ static uint8_t advertising_set_handle = 0xff;
 uint16_t gattdb_session;
 
 #define VERSION_MAJ	2u
-#define VERSION_MIN	5u
+#define VERSION_MIN	6u
 
 #define TRUE   1u
 #define FALSE  0u
@@ -120,7 +130,9 @@ uint16_t gattdb_session;
 #define DEFAULT_PHY test_phy_1m	//default to use 1Mbit PHY
 
 /* Program defaults - will use these if not specified on command line */
-#define DEFAULT_DURATION		1000*1000	//1 second
+#ifndef DEFAULT_DURATION
+  #define DEFAULT_DURATION		0	//default=0 (can override with global #define)
+#endif
 #ifndef DEFAULT_PACKET_TYPE
   #define DEFAULT_PACKET_TYPE		sl_bt_test_pkt_carrier 	//unmodulated carrier
 #endif
@@ -181,7 +193,9 @@ static enum app_states {
   dtm_rx_started,
   dtm_tx_started,
   default_state,
-  verify_custom_bgapi
+  verify_custom_bgapi,
+  advscan_wait,
+  advscan_run
 } app_state =   default_state;
 
 #define MAX_CUST_BGAPI_STRING_LEN  16u
@@ -199,7 +213,16 @@ static uint8_t fwrev_type_data[FWREV_TYPE_LEN] = {GATT_FWREV_LO,GATT_FWREV_HI};
 static uint16_t ctune_value=0; //unsigned int representation of ctune
 static uint8_t ctune_array[CTUNE_PSKEY_LENGTH]; //ctune value to be stored (little endian)
 static bd_addr new_address; //mac address to be stored
+static bd_addr scan_filt_address; //mac address for adv scan filtering
+static uint8_t scan_filt_flag=false; //true if scan filtering is specified
+static uint32_t scan_counter; //scan result count
+static uint32_t rssi_len; //number of packets to average
+static int32_t rssi_sum; //signed sum of RSSI
+static uint32_t rssi_count;
+
 static size_t ctune_ret_len;
+
+static int64_t start_time_us;
 
 /* Store NCP version information */
 static uint8_t version_major;
@@ -207,6 +230,9 @@ static uint8_t version_minor;
 static uint8_t version_patch;
 
 //static void print_usage(void);
+static void print_address(bd_addr address);
+
+static int64_t cur_time_us(void);
 
 unsigned int toInt(char c) {
   /* Convert ASCII hex to binary, return -1 if error */
@@ -392,6 +418,34 @@ void app_init(int argc, char *argv[])
         }
         break;
 
+      case LONG_OPT_RSSI_AVG:
+        rssi_len = atoi(optarg);
+        break;
+
+      case LONG_OPT_ADVSCAN:
+        app_state = advscan_wait;
+
+        if (optarg) {
+          /* Optional parameter is present, so process it */
+          /* set bluetooth address */
+          if( 6 == sscanf(optarg, "%x:%x:%x:%x:%x:%x", &values[5], &values[4],
+            &values[3], &values[2], &values[1], &values[0]) )
+          {
+            /* convert to uint8_t */
+            for( i = 0; i < 6; ++i ) {
+              scan_filt_address.addr[i] = (uint8_t) values[i];
+            }
+            scan_filt_flag = true;
+          }
+          else
+          {
+            /* invalid mac */
+            printf("Error in advscan mac address - enter 6 ascii hex bytes separated by ':'\n");
+            exit(EXIT_FAILURE);
+          }
+        }
+        break;
+
       // Process options for other modules.
       default:
         sc = ncp_host_set_option((char)opt, optarg);
@@ -436,6 +490,12 @@ void app_process_action(void)
   // This is called infinitely.                                              //
   // Do not call blocking functions from here!                               //
   /////////////////////////////////////////////////////////////////////////////
+  if (app_state == advscan_run && duration_usec != 0) {
+    // Check for advscan timeout here (deinit to stop, print, exit)
+    if (cur_time_us() > start_time_us + duration_usec ) {
+      app_deinit();
+    }
+  }
 }
 
 /**************************************************************************//**
@@ -485,6 +545,10 @@ void app_deinit(void)
 
     } while (exitwhile == false);
 
+  } else if (app_state == advscan_run) {
+    // Turn off scan and print the number of scan results received
+    printf("Exiting scan mode, total scan packets received = %u\r\n", scan_counter);
+    sl_bt_scanner_stop();
   }
 
   ncp_host_deinit();
@@ -614,6 +678,39 @@ void sl_bt_on_event(sl_bt_msg_t *evt)
           exit(EXIT_SUCCESS); //test done - terminate
         }
         break;
+
+      case sl_bt_evt_scanner_scan_report_id:
+        if (scan_filt_flag == true) {
+          if (evt->data.evt_scanner_scan_report.address.addr[5] != scan_filt_address.addr[5] ||
+            evt->data.evt_scanner_scan_report.address.addr[4] != scan_filt_address.addr[4] ||
+            evt->data.evt_scanner_scan_report.address.addr[3] != scan_filt_address.addr[3] ||
+            evt->data.evt_scanner_scan_report.address.addr[2] != scan_filt_address.addr[2] ||
+            evt->data.evt_scanner_scan_report.address.addr[1] != scan_filt_address.addr[1] ||
+            evt->data.evt_scanner_scan_report.address.addr[0] != scan_filt_address.addr[0] )
+           {
+            // scan doesn't match the filter - discard
+            break;
+          }
+        }
+        scan_counter++;
+        // print scan packet info if not averaging
+        if (rssi_len == 0) {
+          printf("ADV RCVD from MAC ");
+	        print_address(evt->data.evt_scanner_scan_report.address);
+          printf(", Channel: %d",evt->data.evt_scanner_scan_report.channel);
+			    printf(", RSSI: %d\r\n", evt->data.evt_scanner_scan_report.rssi);
+        } else {
+          // Handle averaging
+          rssi_sum += evt->data.evt_scanner_scan_report.rssi;
+          rssi_count++;
+          if (rssi_count >= rssi_len) {
+            // print average and reset totals
+            printf("AVG RSSI REPORT: %2.2f\r\n",(float)rssi_sum/(float)rssi_count);
+            rssi_count = 0;
+            rssi_sum = 0;
+          }
+        }
+    break;
     // -------------------------------
     // Default event handler.
     default:
@@ -747,14 +844,9 @@ void main_app_handler(void) {
   }
   else if (ps_state == ps_write_mac) {
     /* write MAC value and reboot */
-    printf("Writing MAC address: %02X:%02X:%02X:%02X:%02X:%02X\n",
-    new_address.addr[5], // <-- address is little-endian
-    new_address.addr[4],
-    new_address.addr[3],
-    new_address.addr[2],
-    new_address.addr[1],
-    new_address.addr[0]
-    );
+    printf("Writing MAC address: ");
+    print_address(new_address);
+    printf("\r\n");
     sc = sl_bt_system_set_identity_address(new_address, 0); //set public address
     app_assert_status(sc);
     ps_state = ps_none; /* reset state machine */
@@ -809,6 +901,29 @@ void main_app_handler(void) {
       }
       exit(EXIT_SUCCESS);
     }
+  } else if (app_state == advscan_wait) {
+    if (scan_filt_flag == true) {
+      printf("Enabling advertising scan with MAC address filter ");
+      print_address(scan_filt_address);
+      printf(". ");
+    } else {
+      printf("Enabling advertising scan. ");
+    }
+    printf("\r\n");
+    if (rssi_len != 0) {
+      printf("RSSI averaging over %d packets\r\n", rssi_len);
+    } else {
+      printf("No RSSI averaging - info from every packet will be printed\r\n");
+    }
+    sl_bt_scanner_start(1u,sl_bt_scanner_discover_observation); // scan with 1M PHY
+    if (duration_usec == 0) {
+      // infinite mode
+      printf("Infinite mode. Press control-c to exit.\r\n");
+    } else {
+      printf("Scanning for %d milliseconds\r\n", duration_usec/1000);
+      start_time_us = cur_time_us();
+    }
+    app_state = advscan_run;
   }
   else if (ps_state == ps_none) {
     app_state = dtm_tx_begin;
@@ -848,4 +963,31 @@ void main_app_handler(void) {
     sc = sl_bt_test_dtm_end();
     app_assert_status(sc);
   }
+}
+
+void print_address(bd_addr address)
+{
+    for (int i = 5; i >= 0; i--)
+    {
+        printf("%02X", address.addr[i]);
+        if (i > 0)
+            printf(":");
+    }
+}
+
+static int64_t cur_time_us(void) {
+  /* Return current time in us */
+  struct timespec tms;
+
+  assert(clock_gettime(CLOCK_REALTIME,&tms) != -1);
+
+  /* seconds, multiplied with 1 million */
+  int64_t micros = tms.tv_sec * 1000000;
+  /* Add full microseconds */
+  micros += tms.tv_nsec/1000;
+  /* round up if necessary */
+  if (tms.tv_nsec % 1000 >= 500) {
+      ++micros;
+  }
+  return micros;
 }

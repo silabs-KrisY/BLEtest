@@ -76,6 +76,9 @@ Arguments:
 --adv       Enter a fast advertisement mode with scan response for TIS/TRP chamber testing
 --cust <ASCII hex command string> Allows verification/running custom BGAPI commands.
 --phy <PHY selection for test packets/waveforms/RX mode, 1:1Mbps, 2:2Mbps, 3:125k LR coded, 4:500k LR coded.>
+--advscan   Return RSSI, channel, and MAC address for advertisement scan results
+--advscan=<optional MAC address for filtering, e.g. 01:02:03:04:05:06>
+--rssi_avg <number of packets to include in RSSI average reports for advscan>
 ```
 
 Refer to the [Blue Gecko API documentation](https://docs.silabs.com/bluetooth/latest/) for more details about the various arguments.
@@ -87,9 +90,11 @@ $ ./exe/BLEtest -u /dev/ttyACM0
 ------------------------
 Waiting for boot pkt...
 
-boot pkt rcvd: gecko_evt_system_boot(3, 2, 2, 267, 0x 1090002, 1)
-MAC address: 00:0D:6F:20:B2:D6
-Outputting modulation type 0xFE for 1000 ms at 2402 MHz at 5.0 dBm, phy=0x01
+boot pkt rcvd: gecko_evt_system_boot(3, 3, 2, 406, 0x       0, 1)
+MAC address: 90:FD:9F:7B:53:23
+Outputting modulation type 0xFE for 0 ms at 2402 MHz at 5.0 dBm, phy=0x01
+Infinite mode. Press control-c to exit...
+^CCanceling DTM in progress...
 DTM completed, number of packets transmitted: 0
 ```
 
@@ -136,19 +141,19 @@ DTM receive completed. Number of packets received: 16214
 
 4. Program custom MAC address 01:02:03:04:05:06 on device connected to virtual COM port /dev/ttyACM0:
 ```
-$ ./exe/BLEtest -u /dev/ttyACM0 --addr_set 01:02:03:04:05:06
+$ ./exe/BLEtest -u /dev/ttyACM1 --addr_set 01:02:03:04:05:06 --time 1
 
 ------------------------
 Waiting for boot pkt...
 
-boot pkt rcvd: gecko_evt_system_boot(3, 2, 4, 297, 0x 1090002, 1)
-MAC address: 00:0D:6F:08:62:3F
+boot pkt rcvd: gecko_evt_system_boot(3, 3, 2, 406, 0x       0, 1)
+MAC address: 01:02:03:04:05:06
 Writing MAC address: 01:02:03:04:05:06
 Rebooting with new MAC address...
 
-boot pkt rcvd: gecko_evt_system_boot(3, 2, 4, 297, 0x 1090002, 1)
+boot pkt rcvd: gecko_evt_system_boot(3, 3, 2, 406, 0x       0, 1)
 MAC address: 01:02:03:04:05:06
-Outputting modulation type 0xFE for 1000 ms at 2402 MHz at 5.0 dBm, phy=0x01
+Outputting modulation type 0xFE for 1 ms at 2402 MHz at 5.0 dBm, phy=0x01
 DTM completed, number of packets transmitted: 0
 ```
 
@@ -200,6 +205,67 @@ Test completed!
 $ ./exe/BLEtest -u /dev/ttyACM0 --adv > /dev/null 2>&1 &
 [1] 25670
 $
+```
+
+9.  Scan for advertising packets (no filtering) for 500 ms.
+ ```
+ $ ./exe/BLEtest -u /dev/ttyACM1 --advscan --time 500
+
+ ------------------------
+ Waiting for boot pkt...
+
+ boot pkt rcvd: gecko_evt_system_boot(3, 3, 2, 406, 0x       0, 1)
+ MAC address: 90:FD:9F:7B:53:23
+ Enabling advertising scan.
+ No RSSI averaging - info from every packet will be printed
+ Scanning for 500 milliseconds
+ ADV RCVD from MAC 41:B8:FA:26:10:75, Channel: 38, RSSI: -40
+ ADV RCVD from MAC F4:5C:89:CA:51:80, Channel: 38, RSSI: -40
+ ADV RCVD from MAC 63:61:A9:EC:76:81, Channel: 38, RSSI: -54
+ ADV RCVD from MAC 01:95:DE:A0:D9:9E, Channel: 37, RSSI: -53
+ ADV RCVD from MAC 41:B8:FA:26:10:75, Channel: 38, RSSI: -40
+ ADV RCVD from MAC F4:5C:89:CA:51:80, Channel: 39, RSSI: -46
+ ADV RCVD from MAC 63:61:A9:EC:76:81, Channel: 38, RSSI: -54
+ ADV RCVD from MAC F4:5C:89:CA:51:80, Channel: 39, RSSI: -45
+ ADV RCVD from MAC 01:95:DE:A0:D9:9E, Channel: 38, RSSI: -54
+ ADV RCVD from MAC 63:61:A9:EC:76:81, Channel: 39, RSSI: -56
+ Exiting scan mode, total scan packets received = 10
+```
+
+10.  Scan for advertising packets filtering on a MAC address for 500 ms.
+ ```
+ $ ./exe/BLEtest -u /dev/ttyACM1 --advscan=63:61:A9:EC:76:81 --time 500
+
+ ------------------------
+ Waiting for boot pkt...
+
+ boot pkt rcvd: gecko_evt_system_boot(3, 3, 2, 406, 0x       0, 1)
+ MAC address: 90:FD:9F:7B:53:23
+ Enabling advertising scan with MAC address filter 63:61:A9:EC:76:81.
+ No RSSI averaging - info from every packet will be printed
+ Scanning for 500 milliseconds
+ ADV RCVD from MAC 63:61:A9:EC:76:81, Channel: 37, RSSI: -55
+ ADV RCVD from MAC 63:61:A9:EC:76:81, Channel: 38, RSSI: -62
+ Exiting scan mode, total scan packets received = 2
+```
+
+11.  Scan for advertising packets, filtering on a MAC address, averaging RSSI over every 10 packets, infinite mode.
+ ```
+ $ ./exe/BLEtest -u /dev/ttyACM1 --advscan=63:61:A9:EC:76:81 --rssi_avg 10
+
+ ------------------------
+ Waiting for boot pkt...
+
+ boot pkt rcvd: gecko_evt_system_boot(3, 3, 2, 406, 0x       0, 1)
+ MAC address: 90:FD:9F:7B:53:23
+ Enabling advertising scan with MAC address filter 63:61:A9:EC:76:81.
+ RSSI averaging over 10 packets
+ Infinite mode. Press control-c to exit.
+ AVG RSSI REPORT: -53.30
+ AVG RSSI REPORT: -52.80
+ AVG RSSI REPORT: -54.00
+ AVG RSSI REPORT: -53.10
+ ^CExiting scan mode, total scan packets received = 49
 ```
 
 ## Deployment

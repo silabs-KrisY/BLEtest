@@ -4,9 +4,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.6.0] - 2022-05-17
+### Added
+- Adds support for advertising scan w/ MAC filtering, rssi averaging, and timeout
+
+### Changed
+- Changes default time for all modes to "0" (infinite mode). Can override with global #define on DEFAULT_DURATION
+
 ## [2.5.0] - 2022-05-11
 ### Added
-- Adds support for "infinte mode" when --time argument is zero. Infinite mode continuously transmits or receives until stopped by control-C.
+- Adds support for "infinite mode" when --time argument is zero. Infinite mode continuously transmits or receives until stopped by control-C.
 
 ### Fixed
 - Fixes issue with power level parameter for continuously modulated TX by using new API available in Bluetooth SDK v3.3 (note 20 dBm continuously modulated TX not enabled until fix in Bluetooth SDK v3.3.1)
