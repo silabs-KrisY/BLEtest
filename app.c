@@ -122,7 +122,7 @@ static uint8_t advertising_set_handle = 0xff;
 uint16_t gattdb_session;
 
 #define VERSION_MAJ	2u
-#define VERSION_MIN	6u
+#define VERSION_MIN	7u
 
 #define TRUE   1u
 #define FALSE  0u
@@ -858,7 +858,16 @@ void main_app_handler(void) {
     printf("DTM receive enabled, freq=%d MHz, phy=0x%02X\n",2402+(2*channel), selected_phy);
     sc = sl_bt_test_dtm_rx(channel,selected_phy);
     app_assert_status(sc);
-    usleep(duration_usec);  /* sleep during test */
+    if (duration_usec != 0) {
+      usleep(duration_usec);	/* sleep during test */
+    } else {
+        // Infinte mode
+        printf("Infinite mode. Press control-c to exit...\r\n");
+        while(1) {
+          // wait here for control-c, sleeping periodically to save host CPU cycles
+          usleep(1000);
+        }
+    }
     sc = sl_bt_test_dtm_end();
     app_assert_status(sc);
   }
