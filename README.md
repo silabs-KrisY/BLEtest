@@ -61,24 +61,27 @@ Arguments:
 -u <UART port name>
 -t <tcp address>
 -b <baud_rate, default 115200>
--f          Enable hardware flow control
---version   Print version number defined in application.
---time <duration of test in milliseconds>, 0 for infinite mode (exit with control-c)
---packet_type <payload/modulation type, 0:PBRS9, 1:11110000 packet payload, 2:10101010 packet payload, 253:PN9 continuously modulated, 254:unmodulated carrier>
---power <power level in 0.1dBm steps>
---channel <channel, 2402 MHz + 2*channel>
---len <packet length, ignored for unmodulated carrier>
---rx        DTM receive test. Prints number of received DTM packets.
---ctune_set <Set 16-bit crystal tuning value, e.g. 0x0136>
---addr_set <Set 48-bit MAC address, e.g. 01:02:03:04:05:06>
---ctune_get Read 16-bit crystal tuning value
---fwver_get Read FW revision string from Device Information (GATT)
---adv       Enter a fast advertisement mode with scan response for TIS/TRP chamber testing
---cust <ASCII hex command string> Allows verification/running custom BGAPI commands.
---phy <PHY selection for test packets/waveforms/RX mode, 1:1Mbps, 2:2Mbps, 3:125k LR coded, 4:500k LR coded.>
---advscan   Return RSSI, channel, and MAC address for advertisement scan results
+-f            Enable hardware flow control
+--version     Print version number defined in application.
+--time        <duration of test in milliseconds>, 0 for infinite mode (exit with control-c)
+--packet_type <payload/modulation type, 0:PBRS9 packet payload, 1:11110000 packet payload, 2:10101010 packet payload, 4:111111 packet payload, 5:00000000 packet payload, 6:00001111 packet payload, 7:01010101 packet payload, 253:PN9 continuously modulated, 254:unmodulated carrier>
+--power       <power level in 0.1dBm steps>
+--channel     <channel, 2402 MHz + 2*channel>
+--len         <packet length, ignored for unmodulated carrier>
+--rx          DTM receive test. Prints number of received DTM packets.
+--ctune_set   <Set 16-bit crystal tuning value, e.g. 0x0136>
+--addr_set    <Set 48-bit MAC address, e.g. 01:02:03:04:05:06>
+--ctune_get   Read 16-bit crystal tuning value
+--fwver_get   Read FW revision string from Device Information (GATT)
+--adv         Enter an advertisement mode with scan response for TIS/TRP chamber and connection testing (default period = 100ms)
+--adv_period  <Advertising period for the advertisement mode, in units of 0.625ms>
+--cust        <ASCII hex command string> Allows verification/running custom BGAPI commands.
+--phy         <PHY selection for test packets/waveforms/RX mode, 1:1Mbps, 2:2Mbps, 3:125k LR coded, 4:500k LR coded.>
+--advscan     Return RSSI, channel, and MAC address for advertisement scan results
 --advscan=<optional MAC address for filtering, e.g. 01:02:03:04:05:06>
---rssi_avg <number of packets to include in RSSI average reports for advscan>
+--rssi_avg    <number of packets to include in RSSI average reports for advscan>
+--conn        <connect as central to 48-bit MAC address, e.g. 01:02:03:04:05:06>
+--conn_int    <connection interval of central connection, in units of 1.25ms>
 ```
 
 Refer to the [Blue Gecko API documentation](https://docs.silabs.com/bluetooth/latest/) for more details about the various arguments.
@@ -200,9 +203,9 @@ Outputting modulation type 253 for 5000 ms at 2402 MHz at 10.0 dBm, phy=0x02
 Test completed!
 ```
 
-8. Run in fast advertisement mode as a background process for TIS/TRP chamber testing.
+8. Run in advertisement mode with 50ms period as a background process for TIS/TRP chamber testing.
 ```
-$ ./exe/BLEtest -u /dev/ttyACM0 --adv > /dev/null 2>&1 &
+$ ./exe/BLEtest -u /dev/ttyACM0 --adv --adv_period 80 > /dev/null 2>&1 &
 [1] 25670
 $
 ```

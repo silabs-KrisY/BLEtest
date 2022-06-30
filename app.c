@@ -62,7 +62,7 @@
   "   -h                Print this help message.\n" \
   "   --version         Print the software version defined in the application.\n" \
   "   --time <duration of test in milliseconds>, 0 for infinite mode (exit with control-c)\n" \
-  "   --packet_type <payload/modulation type, 0:PBRS9, 1:11110000 packet payload, 2:10101010 packet payload, 253:PN9 continuously modulated, 254:unmodulated carrier>\n" \
+  "   --packet_type <payload/modulation type, 0:PBRS9 packet payload, 1:11110000 packet payload, 2:10101010 packet payload, 4:111111 packet payload, 5:00000000 packet payload, 6:00001111 packet payload, 7:01010101 packet payload, 253:PN9 continuously modulated, 254:unmodulated carrier>\n" \
   "   --power <power level in 0.1dBm steps>\n" \
   "   --channel <channel, 2402 MHz + 2*channel>\n" \
   "   --len <packet length, ignored for unmodulated carrier>\n" \
@@ -71,12 +71,15 @@
   "   --addr_set <Set 48-bit MAC address, e.g. 01:02:03:04:05:06>\n" \
   "   --ctune_get       Read 16-bit crystal tuning value\n" \
   "   --fwver_get       Read FW revision string from Device Information (GATT)\n" \
-  "   --adv             Enter a fast advertisement mode with scan response for TIS/TRP chamber testing\n" \
+  "   --adv             Enter an advertisement mode with scan response for TIS/TRP chamber and connection testing\n" \
+  "   --adv_period      <Advertising period for the advertisement mode, in units of 0.625ms>\n" \
   "   --cust <ASCII hex command string> Allows verification/running custom BGAPI commands.\n" \
   "   --phy <PHY selection for test packets/waveforms/RX mode, 1:1Mbps, 2:2Mbps, 3:125k LR coded, 4:500k LR coded.>\n" \
   "   --advscan         Return RSSI, LENGTH, and MAC address for advertisement scan results\n" \
   "   --advscan=<optional MAC address for filtering, e.g. 01:02:03:04:05:06>\n" \
-  "   --rssi_avg <number of packets to include in RSSI average reports for advscan>\n"
+  "   --rssi_avg        <number of packets to include in RSSI average reports for advscan>\n" \
+  "   --conn <connect as central to 48-bit MAC address, e.g. 01:02:03:04:05:06>\n" \
+  "   --conn_int        <connection interval of central connection, in units of 1.25ms> \n"
 
   #define LONG_OPT_VERSION 0
   #define LONG_OPT_TIME 1
@@ -95,6 +98,9 @@
   #define LONG_OPT_PHY 14
   #define LONG_OPT_ADVSCAN 15u
   #define LONG_OPT_RSSI_AVG 16u
+  #define LONG_OPT_CONN 17u
+  #define LONG_OPT_CONN_INT 18u
+  #define LONG_OPT_ADV_PERIOD 19u
 
   static struct option long_options[] = {
              {"version",    no_argument,       0,  LONG_OPT_VERSION },
@@ -112,7 +118,10 @@
              {"cust",       required_argument, 0,  LONG_OPT_CUST },
              {"phy",        required_argument, 0,  LONG_OPT_PHY },
              {"advscan",    optional_argument, 0,  LONG_OPT_ADVSCAN },
-             {"rssi_avg",  required_argument, 0,  LONG_OPT_RSSI_AVG },
+             {"rssi_avg",   required_argument, 0,  LONG_OPT_RSSI_AVG },
+             {"conn",       required_argument, 0,  LONG_OPT_CONN },
+             {"conn_int",   required_argument, 0,  LONG_OPT_CONN_INT },
+             {"adv_period", required_argument, 0,  LONG_OPT_ADV_PERIOD },
              {0,           0,                 0,  0  }};
 
 // The advertising set handle allocated from Bluetooth stack.
@@ -122,7 +131,7 @@ static uint8_t advertising_set_handle = 0xff;
 uint16_t gattdb_session;
 
 #define VERSION_MAJ	2u
-#define VERSION_MIN	7u
+#define VERSION_MIN	8u
 
 #define TRUE   1u
 #define FALSE  0u
@@ -151,7 +160,7 @@ uint16_t gattdb_session;
 static uint8_t packet_type=DEFAULT_PACKET_TYPE;
 
 /* The power level */
-static uint16_t power_level=DEFAULT_POWER_LEVEL;
+static int16_t power_level=DEFAULT_POWER_LEVEL;
 
 /* The duration in us */
 static uint32_t duration_usec=DEFAULT_DURATION;
@@ -166,12 +175,13 @@ static uint8_t packet_length=DEFAULT_PACKET_LENGTH;
 static uint8_t selected_phy=DEFAULT_PHY;
 
 /* advertising test mode */
-#define TEST_ADV_INTERVAL_MS 50
+#define TEST_ADV_INTERVAL_MS_DEFAULT 100 //100ms default
 #define ADV_INTERVAL_UNIT 0.625 //per API guide
 
 #define MAX_POWER_LEVEL 200 //deci-dBm
-#define MIN_POWER_LEVEL -100 //deci-dBm
+#define MIN_POWER_LEVEL -300 //deci-dBm
 
+static uint16_t adv_period = TEST_ADV_INTERVAL_MS_DEFAULT/ADV_INTERVAL_UNIT;
 static uint8_t adv_data[] = {0x02, 0x01, 0x06, 0x03, 0x03, 0x02, 0x18}; //LE general discoverable, FIND ME service (0x1802)
 /* 20 byte length, 0x09 (full name), "Blue Gecko Test App" */
 static uint8_t scan_rsp_data[] = {20,0x09,0x42,0x6c,0x75,0x65,0x20,0x47,0x65,0x63,0x6b,0x6f,0x20,0x54,0x65,0x73,0x74,0x20,0x41,0x70,0x70};
@@ -195,7 +205,10 @@ static enum app_states {
   default_state,
   verify_custom_bgapi,
   advscan_wait,
-  advscan_run
+  advscan_run,
+  conn_initiate,
+  conn_pending,
+  connected
 } app_state =   default_state;
 
 #define MAX_CUST_BGAPI_STRING_LEN  16u
@@ -229,8 +242,18 @@ static uint8_t version_major;
 static uint8_t version_minor;
 static uint8_t version_patch;
 
-//static void print_usage(void);
+static bd_addr conn_address; //mac address for connection
+static uint8_t conn_handle;
+static uint8_t timeout_count=0;
+#define CONN_INTERVAL_DEFAULT 16u // 16/1.25ms = 20ms
+#define CONN_INTERVAL_UNIT_MS 1.25
+static uint16_t conn_interval=CONN_INTERVAL_DEFAULT; //connection interval for central connection
+#define SUP_TIMEOUT_FACTOR 4u   //how many connection intervals pass before timeout occurs
+#define SUP_TIMEOUT_VAL_MIN 10u //minimum timeout value in API
+
 static void print_address(bd_addr address);
+static void initiate_connection(void);
+void print_packet_counters(void);
 
 static int64_t cur_time_us(void);
 
@@ -446,6 +469,36 @@ void app_init(int argc, char *argv[])
         }
         break;
 
+      case LONG_OPT_CONN:
+        app_state = conn_initiate;
+        /* set bluetooth address */
+        if( 6 == sscanf(optarg, "%x:%x:%x:%x:%x:%x", &values[5], &values[4],
+          &values[3], &values[2], &values[1], &values[0]) )
+        {
+          /* convert to uint8_t */
+          for( i = 0; i < 6; ++i ) {
+            conn_address.addr[i] = (uint8_t) values[i];
+          }
+        }
+        else
+        {
+          /* invalid mac */
+          printf("Error in conn mac address - enter 6 ascii hex bytes separated by ':'\n");
+          exit(EXIT_FAILURE);
+        }
+        break;
+
+      case LONG_OPT_CONN_INT:
+        /* connection interval for central connection */
+        conn_interval = atoi(optarg);
+        break;
+
+      case LONG_OPT_ADV_PERIOD:
+        /* advertising period for advertising mode */
+        adv_period = atoi(optarg);
+        break;
+
+
       // Process options for other modules.
       default:
         sc = ncp_host_set_option((char)opt, optarg);
@@ -549,8 +602,32 @@ void app_deinit(void)
     // Turn off scan and print the number of scan results received
     printf("Exiting scan mode, total scan packets received = %u\r\n", scan_counter);
     sl_bt_scanner_stop();
-  }
+  } else if (app_state == connected) {
+    // clean up connetion if connected as central
+    printf("Disconnecting...\r\n");
+    start_time = time(NULL);
+    sc = sl_bt_connection_close(conn_handle);
+    do {
+      sc = sl_bt_pop_event(&evt);
 
+      if (sc == SL_STATUS_OK) {
+        if (SL_BGAPI_MSG_ID(evt.header) == sl_bt_evt_connection_closed_id) {
+          printf("Disconnected from central\r\n");
+          exitwhile = true;
+        }
+      }
+
+      if ((time(NULL) - start_time) >= CANCEL_TIMEOUT_SECONDS) { //timeout in seconds
+        exitwhile = true;
+      }
+
+    } while (exitwhile == false);
+    print_packet_counters();
+  }
+  if (app_state == adv_test || app_state == connected || app_state == conn_pending \
+        || app_state == conn_initiate) {
+    app_log_debug("Supervision timeout count: %d\r\n", timeout_count);
+  }
   ncp_host_deinit();
 
   /////////////////////////////////////////////////////////////////////////////
@@ -574,6 +651,7 @@ void sl_bt_on_event(sl_bt_msg_t *evt)
   bd_addr address;
   uint8_t address_type;
   int16_t power_level_set_min, power_level_set_max;
+  uint16_t null_var;
 
   switch (SL_BT_MSG_ID(evt->header)) {
     // -------------------------------
@@ -604,7 +682,7 @@ void sl_bt_on_event(sl_bt_msg_t *evt)
         address.addr[0]);
 
       // Set power limits to max (note - max will generally be internally
-      // limited to 10 dBm)
+      // limited to 10 dBm without AFH component)
       sc = sl_bt_system_set_tx_power(MIN_POWER_LEVEL, MAX_POWER_LEVEL, &power_level_set_min, &power_level_set_max);
       app_assert_status(sc);
 
@@ -618,6 +696,16 @@ void sl_bt_on_event(sl_bt_msg_t *evt)
     // This event indicates that a new connection was opened.
     case sl_bt_evt_connection_opened_id:
       printf("Connection opened." APP_LOG_NL);
+      // reset connection packet debug counters
+      sc = sl_bt_system_get_counters(true, &null_var, &null_var,
+                                    &null_var, &null_var);
+      // get connection RSSI
+      sc = sl_bt_connection_get_rssi(evt->data.evt_connection_opened.connection);
+      app_assert_status(sc);
+      if (app_state == conn_pending) {
+        // handle connection mode as central
+        app_state = connected;
+      }
       break;
 
     case sl_bt_evt_dfu_boot_id:
@@ -628,6 +716,13 @@ void sl_bt_on_event(sl_bt_msg_t *evt)
     // This event indicates that a connection was closed.
     case sl_bt_evt_connection_closed_id:
       printf("Disconnected from central" APP_LOG_NL);
+      app_log_debug("Disconnect reason:0x%2x\r\n",evt->data.evt_connection_closed.reason);
+      print_packet_counters();
+      if (evt->data.evt_connection_closed.reason == SL_STATUS_BT_CTRL_CONNECTION_TIMEOUT) {
+        // increment supervision timeout counter
+        timeout_count++;
+      }
+
       // Restart advertising after client has disconnected.
       if (app_state == adv_test)
       {
@@ -637,6 +732,10 @@ void sl_bt_on_event(sl_bt_msg_t *evt)
           sl_bt_advertiser_connectable_scannable);
         app_assert_status(sc);
         printf("Started advertising." APP_LOG_NL);
+      } else if (app_state == connected)
+      {
+        // we were connected, so try to reconnect
+        initiate_connection();
       }
       break;
 
@@ -711,10 +810,32 @@ void sl_bt_on_event(sl_bt_msg_t *evt)
           }
         }
     break;
+
+    case sl_bt_evt_connection_parameters_id:
+      app_log_debug("Conn params interval=%3f ms, timeout: %d ms\r\n",
+                    (float)evt->data.evt_connection_parameters.interval * 1.25,
+                    evt->data.evt_connection_parameters.timeout * 10);
+      break;
+
+    case sl_bt_evt_connection_rssi_id:
+      printf("Connection RSSI=%d dBm\r\n", evt->data.evt_connection_rssi.rssi);
+      break;
+
+    case sl_bt_evt_gatt_mtu_exchanged_id:
+      app_log_debug("MTU exchanged, MTU:%d\r\n", evt->data.evt_gatt_mtu_exchanged.mtu);
+      break;
+
+    case sl_bt_evt_connection_remote_used_features_id:
+    case sl_bt_evt_connection_phy_status_id:
+    case sl_bt_evt_connection_tx_power_id:
+      // Do nothing
+      break;
+
     // -------------------------------
     // Default event handler.
     default:
-    printf("Unhandled event received, event ID: 0x%2x\n", SL_BT_MSG_ID(evt -> header));
+    // Print unhandled events with debug log level
+      app_log_debug("Unhandled event received, event ID: 0x%2x\n", SL_BT_MSG_ID(evt -> header));
       break;
   }
 }
@@ -874,18 +995,22 @@ void main_app_handler(void) {
   else if (app_state == adv_test)
   {
     /* begin advertisement test */
-    printf("\n--> Starting fast advertisements for testing\n");
+    printf("\nStarting advertisements at period = %dms\r\n", (uint16_t) (adv_period * ADV_INTERVAL_UNIT));
     sc = sl_bt_system_set_tx_power(power_level, power_level, &power_level_set_min, &power_level_set_max);
+    app_assert_status(sc);
     printf("Attempted power setting of %.1f dBm, actual setting %.1f dBm\n",(float)power_level/10,(float)power_level_set_max/10);
     printf("Press 'control-c' to end...\n");
     sc = sl_bt_advertiser_create_set(&advertising_set_handle);
     app_assert_status(sc);
     sc = sl_bt_advertiser_set_data(advertising_set_handle, 0, sizeof(adv_data),adv_data); //advertising data
+    app_assert_status(sc);
     sc = sl_bt_advertiser_set_data(advertising_set_handle, 1, sizeof(scan_rsp_data), scan_rsp_data); //scan response data
-    sc = sl_bt_advertiser_set_timing(advertising_set_handle, TEST_ADV_INTERVAL_MS/ADV_INTERVAL_UNIT,TEST_ADV_INTERVAL_MS/ADV_INTERVAL_UNIT,0,0);
+    app_assert_status(sc);
+    sc = sl_bt_advertiser_set_timing(advertising_set_handle, adv_period,adv_period,0,0);
+    app_assert_status(sc);
     sc = sl_bt_advertiser_start(advertising_set_handle, sl_bt_advertiser_general_discoverable,
       sl_bt_advertiser_connectable_scannable);
-
+    app_assert_status(sc);
   } else if (app_state == verify_custom_bgapi) {
     /* Send custom BGAPI command and print response */
     printf("Sending custom user message to target...\n");
@@ -933,6 +1058,8 @@ void main_app_handler(void) {
       start_time_us = cur_time_us();
     }
     app_state = advscan_run;
+  } else if (app_state == conn_initiate) {
+      initiate_connection();
   }
   else if (ps_state == ps_none) {
     app_state = dtm_tx_begin;
@@ -999,4 +1126,48 @@ static int64_t cur_time_us(void) {
       ++micros;
   }
   return micros;
+}
+
+static void initiate_connection(void) {
+  sl_status_t sc;
+  uint16_t supervision_timeout;
+  int16_t power_level_set_min, power_level_set_max;
+
+  printf("Initiating connection as central with connection interval=%3f ms"
+          " to MAC ", (float)(conn_interval * CONN_INTERVAL_UNIT_MS));
+  print_address(conn_address);
+  printf("\r\n");
+  supervision_timeout = (conn_interval * CONN_INTERVAL_UNIT_MS *
+      SUP_TIMEOUT_FACTOR) / 10;
+  if (supervision_timeout < SUP_TIMEOUT_VAL_MIN) {
+    supervision_timeout = SUP_TIMEOUT_VAL_MIN;
+  }
+  sc = sl_bt_system_set_tx_power(power_level, power_level, &power_level_set_min, &power_level_set_max);
+  app_assert_status(sc);
+  printf("Attempted power setting of %.1f dBm, actual setting %.1f dBm\n",(float)power_level/10,(float)power_level_set_max/10);
+  sc = sl_bt_connection_set_default_parameters(conn_interval, //min_interval
+                                           conn_interval, //max_interval
+                                            0u, //latency
+                                            supervision_timeout, //supervision timeout
+                                            0u,//min_ce_length
+                                            0xffff);//max_ce_length
+  app_assert_status(sc);
+  sc = sl_bt_connection_open(conn_address,
+                             sl_bt_gap_public_address,
+                            sl_bt_gap_phy_1m,
+                             &conn_handle);
+  app_assert_status(sc);
+  app_state = conn_pending;
+}
+
+void print_packet_counters(void) {
+  /* Print packet counters */
+    uint16_t tx_packets, rx_packets, crc_errors, failures;
+    sl_status_t sc;
+    // print counters with no reset
+    sc = sl_bt_system_get_counters(false, &tx_packets, &rx_packets,
+                                  &crc_errors, &failures);
+    app_assert_status(sc);
+    app_log_debug("Last connection packets TX:%d, RX:%d, CRC ERR:%d, failures:%d\r\n",
+                                tx_packets, rx_packets, crc_errors, failures);
 }

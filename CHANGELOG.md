@@ -4,6 +4,23 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.8.0] - 2022-06-30
+### Fixed
+- --power option fixed to accept negative values (i.e. < 0 dBm)
+
+### Added
+- Adds support for initiating connection with specified connection interval and power level
+- Adds ability to specify advertising period in --adv mode
+- Outputs debug information for connection in debug logging mode (-l 4)
+
+### Changed
+- Increases default advertising period for --adv from 50ms to 100ms
+- Changed minimum power setting to -300 (-30 dBm) for low RF output power testing.
+- Tweaked help messages (added more detail to packet options)
+
+### Known Issue
+- When used with Bluetooth SDK 4.0 (GSDK 4.1), the "Legacy Advertising" component needs to be removed from the NCP firmware project in order to maintain compatibility with the API currently used in advertising mode. If the "Legacy Advertising" component is present in the NCP firmware, an assert will result (status = 0x000F).
+
 ## [2.7.0] - 2022-05-19
 ### Fixed
 - Fixes infinite mode for RX
