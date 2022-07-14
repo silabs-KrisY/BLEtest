@@ -4,6 +4,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.9.0] - 2022-07-14
+### Added
+- Adds support for enabling coexistence (--coex) and prints coexistence counters on exit. Coexistence support requires GSDK 4.1 or later (see Known Issues).
+
+### Known Issues
+- If using Gecko SDK 4.1 or greater, you must remove the "Legacy Advertising", "Extended Advertising", and "Periodic Advertising" components from the NCP firmware prior to building, otherwise running BLEtest will result in an assert.
+
 ## [2.8.0] - 2022-06-30
 ### Fixed
 - --power option fixed to accept negative values (i.e. < 0 dBm)

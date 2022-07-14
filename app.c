@@ -79,7 +79,8 @@
   "   --advscan=<optional MAC address for filtering, e.g. 01:02:03:04:05:06>\n" \
   "   --rssi_avg        <number of packets to include in RSSI average reports for advscan>\n" \
   "   --conn <connect as central to 48-bit MAC address, e.g. 01:02:03:04:05:06>\n" \
-  "   --conn_int        <connection interval of central connection, in units of 1.25ms> \n"
+  "   --conn_int        <connection interval of central connection, in units of 1.25ms> \n" \
+  "   --coex             Enable coexistence on the target if available\n" \
 
   #define LONG_OPT_VERSION 0
   #define LONG_OPT_TIME 1
@@ -101,6 +102,7 @@
   #define LONG_OPT_CONN 17u
   #define LONG_OPT_CONN_INT 18u
   #define LONG_OPT_ADV_PERIOD 19u
+  #define LONG_OPT_COEX 20u
 
   static struct option long_options[] = {
              {"version",    no_argument,       0,  LONG_OPT_VERSION },
@@ -122,6 +124,7 @@
              {"conn",       required_argument, 0,  LONG_OPT_CONN },
              {"conn_int",   required_argument, 0,  LONG_OPT_CONN_INT },
              {"adv_period", required_argument, 0,  LONG_OPT_ADV_PERIOD },
+             {"coex",       no_argument,       0,  LONG_OPT_COEX },
              {0,           0,                 0,  0  }};
 
 // The advertising set handle allocated from Bluetooth stack.
@@ -131,7 +134,7 @@ static uint8_t advertising_set_handle = 0xff;
 uint16_t gattdb_session;
 
 #define VERSION_MAJ	2u
-#define VERSION_MIN	8u
+#define VERSION_MIN	9u
 
 #define TRUE   1u
 #define FALSE  0u
@@ -251,9 +254,12 @@ static uint16_t conn_interval=CONN_INTERVAL_DEFAULT; //connection interval for c
 #define SUP_TIMEOUT_FACTOR 4u   //how many connection intervals pass before timeout occurs
 #define SUP_TIMEOUT_VAL_MIN 10u //minimum timeout value in API
 
+static uint8_t coex_enabled=false;
+
 static void print_address(bd_addr address);
 static void initiate_connection(void);
 void print_packet_counters(void);
+void print_coex_counters(void);
 
 static int64_t cur_time_us(void);
 
@@ -498,6 +504,10 @@ void app_init(int argc, char *argv[])
         adv_period = atoi(optarg);
         break;
 
+      case LONG_OPT_COEX:
+        /* enable coexistence on the target */
+        coex_enabled = true;
+        break;
 
       // Process options for other modules.
       default:
@@ -627,6 +637,10 @@ void app_deinit(void)
   if (app_state == adv_test || app_state == connected || app_state == conn_pending \
         || app_state == conn_initiate) {
     app_log_debug("Supervision timeout count: %d\r\n", timeout_count);
+    if (coex_enabled == true) {
+      /* try to print coex counters */
+      print_coex_counters();
+    }
   }
   ncp_host_deinit();
 
@@ -902,11 +916,30 @@ void main_app_handler(void) {
     exit(EXIT_FAILURE);
   }
 
-  /* Default to PTA disabled so PTA doesn't gate any of the DTM outputs. */
-  sc = sl_bt_coex_set_options(coex_option_enable, FALSE);
+  /* Set up PTA/coexistence. Disabled by default so PTA doesn't gate the
+      DTM outputs. Ignore and print debug message if not supported on target */
+  if (coex_enabled == TRUE) {
+    app_log_debug("Attempting to enable coexistence on the target\n");
+    sc = sl_bt_coex_set_options(coex_option_enable, coex_option_enable);
+    if (sc == SL_STATUS_OK) {
+      app_log_debug("Coexistence enabled successfully!\n");
+    }
+  } else {
+    app_log_debug("Attempting to disable coexistence on the target\n");
+    sc = sl_bt_coex_set_options(coex_option_enable, 0x0000);
+    if (sc == SL_STATUS_OK) {
+      app_log_debug("Coexistence disabled successfully!\n");
+    }
+  }
+  sc = sl_bt_coex_set_options(coex_option_enable, coex_enabled ? coex_option_enable : 0);
   if (sc == SL_STATUS_NOT_SUPPORTED) {
-    app_log_debug("Attempted to disable PTA, but Coex not available in the NCP target.\n");
+    if (coex_enabled) {
+      app_log_debug("Could not enable coexistence - not available in the NCP target.\n");
+    } else {
+      app_log_debug("Could not disable coexistence - not available in the NCP target.\n");
+    }
   } else if (sc) {
+    // assert for other errors
     app_assert_status(sc);
   }
   /* Run test commands */
@@ -1170,4 +1203,35 @@ void print_packet_counters(void) {
     app_assert_status(sc);
     app_log_debug("Last connection packets TX:%d, RX:%d, CRC ERR:%d, failures:%d\r\n",
                                 tx_packets, rx_packets, crc_errors, failures);
+}
+
+void print_coex_counters(void) {
+  /* Print all the uint32_t coex counters */
+  sl_status_t sc;
+  size_t len;
+  struct coex_counters_t {
+    uint32_t low_pri_requested;
+    uint32_t high_pri_requested;
+    uint32_t low_pri_denied;
+    uint32_t high_pri_denied;
+    uint32_t low_pri_tx_abort;
+    uint32_t high_pri_tx_abort;
+  } coex_counters;
+  sc = sl_bt_coex_get_counters(0u,
+                               sizeof(coex_counters),
+                               &len,
+                               (uint8_t*)&coex_counters);
+  if (sc == SL_STATUS_NOT_SUPPORTED) {
+   app_log_debug("Cannot print coex counters as coexistence is not available in the NCP target.\n");
+  } else if (sc) {
+   app_assert_status(sc);
+ } else {
+   app_log_debug("coex counters loaded %lu bytes\r\n", len);
+   printf("Coex counters: low_pri_requested=%u, high_pri_requested=%u, "
+           "low_pri_denied=%u, high_pri_denied=%u, "
+           "low_pri_tx_abort=%u, high_pri_tx_abort=%u\r\n",
+           coex_counters.low_pri_requested, coex_counters.high_pri_requested,
+           coex_counters.low_pri_denied,coex_counters.high_pri_denied,
+           coex_counters.low_pri_tx_abort, coex_counters.high_pri_tx_abort);
+ }
 }

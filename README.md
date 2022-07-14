@@ -12,7 +12,7 @@ These instructions will get you a copy of the project up and running on your loc
 
 1. Blue Gecko SDK version v3.3.1 (Gecko SDK 4.0.1) or greater installed via Simplicity Studio v5 or from github. *NOTE: This tool is no longer compatible with Blue Gecko SDK version 2.x. For 2.x compatibility, revert to previous 1.x versions of BLEtest.*
 2. Linux/Posix build environment (OSX, Raspberry Pi, etc.) or Windows (Cygwin/MinGW).
-3. Blue Gecko / Mighty Gecko device running a serial UART NCP (Network Co-Processor) firmware image v3.3.1 (Gecko SDK 4.0.1) or greater. See the "To Run" section below for more details.
+3. Blue Gecko / Mighty Gecko device running a serial UART NCP (Network Co-Processor) firmware image from Bluetooth SDK v3.3.1 (Gecko SDK 4.0.1) or greater. See the "To Run" section below for more details. *NOTE: If using Gecko SDK 4.1 or greater, you must remove the "Legacy Advertising", "Extended Advertising", and "Periodic Advertising" components from the NCP firmware prior to building, otherwise running BLEtest will result in an assert.*
 
 ### Installing
 
@@ -20,7 +20,7 @@ This project can be built as supplied within the Blue Gecko SDK frameworks.
 
 #### For Cygwin/OSX/Linux with Gecko SDK installed
 
-Clone or copy the contents of this repository into the Gecko SDK, into a subfolder of app/bluetooth/example_host. Commands shown here are from OSX using Gecko SDK Suite v3.3, but will be similar in Linux/Cygwin.
+Clone or copy the contents of this repository into the Gecko SDK, into a subfolder of app/bluetooth/example_host. Commands shown here are from OSX using Gecko SDK Suite v4.0.2, but will be similar in Linux/Cygwin.
 
 ```
 $ cd ~/SimplicityStudio/SDKs/gecko_sdk/app/bluetooth/example_host/
@@ -82,6 +82,7 @@ Arguments:
 --rssi_avg    <number of packets to include in RSSI average reports for advscan>
 --conn        <connect as central to 48-bit MAC address, e.g. 01:02:03:04:05:06>
 --conn_int    <connection interval of central connection, in units of 1.25ms>
+--coex        Enable coexistence on the target if available
 ```
 
 Refer to the [Blue Gecko API documentation](https://docs.silabs.com/bluetooth/latest/) for more details about the various arguments.
