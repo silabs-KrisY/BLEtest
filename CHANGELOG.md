@@ -4,6 +4,24 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.10.0] - 2023-03-12
+### Added
+- Adds support for pushing payload/throughput data from the central to the peripheral when in a connection
+- Adds new service / attributes for the purposes of the throughput testing functionality
+- Adds the ability to periodically print a report including the channel map and payload throughput (if throughput is running)
+
+### Fixed
+- Stops advertising when exiting from advertising mode (and disconnects when connected)
+- advscan works when using "Scanner for legacy advertisements" component in NCP firmware
+
+### Changed
+- Updated readme doc
+
+### Known Issues
+- When building your NCP firmware, you must remove the "Legacy Advertising", "Extended Advertising", and "Periodic Advertising" components from the NCP firmware prior to building, otherwise running BLEtest will result in an assert.
+- When building your NCP firmware, you must make sure the "Scanner for legacy advertisements" component is present in the NCP firmware.
+- BLEtest hangs when using control-C to exit the peripheral/advertiser side when it's in an active connection with throughput running. You will have to manually kill the process.
+
 ## [2.9.0] - 2022-07-14
 ### Added
 - Adds support for enabling coexistence (--coex) and prints coexistence counters on exit. Coexistence support requires GSDK 4.1 or later (see Known Issues).

@@ -59,28 +59,34 @@
   "\nOPTIONS\n"    \
   NCP_HOST_OPTIONS \
   APP_LOG_OPTIONS  \
-  "   -h                Print this help message.\n" \
-  "   --version         Print the software version defined in the application.\n" \
-  "   --time <duration of test in milliseconds>, 0 for infinite mode (exit with control-c)\n" \
-  "   --packet_type <payload/modulation type, 0:PBRS9 packet payload, 1:11110000 packet payload, 2:10101010 packet payload, 4:111111 packet payload, 5:00000000 packet payload, 6:00001111 packet payload, 7:01010101 packet payload, 253:PN9 continuously modulated, 254:unmodulated carrier>\n" \
-  "   --power <power level in 0.1dBm steps>\n" \
-  "   --channel <channel, 2402 MHz + 2*channel>\n" \
-  "   --len <packet length, ignored for unmodulated carrier>\n" \
-  "   --rx              DTM receive test. Prints number of received DTM packets.\n" \
-  "   --ctune_set <Set 16-bit crystal tuning value, e.g. 0x0136>\n" \
-  "   --addr_set <Set 48-bit MAC address, e.g. 01:02:03:04:05:06>\n" \
-  "   --ctune_get       Read 16-bit crystal tuning value\n" \
-  "   --fwver_get       Read FW revision string from Device Information (GATT)\n" \
-  "   --adv             Enter an advertisement mode with scan response for TIS/TRP chamber and connection testing\n" \
-  "   --adv_period      <Advertising period for the advertisement mode, in units of 0.625ms>\n" \
-  "   --cust <ASCII hex command string> Allows verification/running custom BGAPI commands.\n" \
-  "   --phy <PHY selection for test packets/waveforms/RX mode, 1:1Mbps, 2:2Mbps, 3:125k LR coded, 4:500k LR coded.>\n" \
-  "   --advscan         Return RSSI, LENGTH, and MAC address for advertisement scan results\n" \
-  "   --advscan=<optional MAC address for filtering, e.g. 01:02:03:04:05:06>\n" \
-  "   --rssi_avg        <number of packets to include in RSSI average reports for advscan>\n" \
-  "   --conn <connect as central to 48-bit MAC address, e.g. 01:02:03:04:05:06>\n" \
-  "   --conn_int        <connection interval of central connection, in units of 1.25ms> \n" \
-  "   --coex             Enable coexistence on the target if available\n" \
+"  -h                      Print help message\n"\
+"  -u <UART port name>                        \n"\
+"  -t <tcp address>\n"\
+"  -b <baud_rate, default 115200>\n"\
+"  -f                      Enable hardware flow control\n"\
+"  --version               Print version number defined in application.\n"\
+"  --time   <duration ms>      Set time for test in milliseconds, 0 for infinite mode (exit with control-c)\n"\
+"  --packet_type <payload/modulation type, 0:PBRS9 packet payload, 1:11110000 packet payload, 2:10101010 packet payload, 4:111111 packet payload, 5:00000000 packet payload, 6:00001111 packet payload, 7:01010101 packet payload, 253:PN9 continuously modulated, 254:unmodulated carrier>\n"\
+"  --power  <power level>      Set power level for test in 0.1dBm steps\n"\
+"  --channel <channel index>   Set channel index for test, frequency=2402 MHz + 2*channel>\n"\
+"  --len <test packet length>  Set test packet length, ignored for unmodulated carrier>\n"\
+"  --rx                        TM receive test. Prints number of received DTM packets.\n"\
+"  --ctune_set <ctune val>     Set 16-bit crystal tuning value, e.g. 0x0136\n"\
+"  --addr_set  <MAC>           Set 48-bit MAC address, e.g. 01:02:03:04:05:06\n"\
+"  --ctune_get                 Read 16-bit crystal tuning value\n"\
+"  --fwver_get                 Read FW revision string from Device Information (GATT)\n"\
+"  --adv                       Enter an advertisement mode with scan response for TIS/TRP chamber and connection testing (default period = 100ms)\n"\
+"  --adv_period  <period>      Set advertising period for the advertisement mode, in units of 0.625ms\n"\
+"  --cust <ASCII hex string>   Allows verification/running custom BGAPI commands. Example of ASCII hex string: a50102feed\n"\
+"  --phy  <PHY selection for test packets/waveforms/RX mode, 1:1Mbps, 2:2Mbps, 3:125k LR coded, 4:500k LR coded.>\n"\
+"  --advscan                   Return RSSI, channel, and MAC address for advertisement scan results\n"\
+"  --advscan=<MAC>             Set optional MAC address for advertising scan filtering, e.g. 01:02:03:04:05:06\n"\
+"  --rssi_avg <number of packets to include in RSSI average reports for advscan>\n"\
+"  --conn=<MAC>                Connect as central to 48-bit MAC address, e.g. 01:02:03:04:05:06\n"\
+"  --conn_int <conn interval>  Set connection interval for central connection, in units of 1.25ms\n"\
+"  --coex                      Enable coexistence on the target if available\n"\
+"  --throughput <0 or 1>       Push dummy throughput data when connected as central to another unit running BLEtest as an advertiser, with ack (1) or without ack (0)\n"\
+"  --report  <interval>        Print the channel map and throughput (if applicable) at the specified interval in milliseconds\n"
 
   #define LONG_OPT_VERSION 0
   #define LONG_OPT_TIME 1
@@ -103,6 +109,8 @@
   #define LONG_OPT_CONN_INT 18u
   #define LONG_OPT_ADV_PERIOD 19u
   #define LONG_OPT_COEX 20u
+  #define LONG_OPT_THROUGHPUT 21u
+  #define LONG_OPT_REPORT 22u
 
   static struct option long_options[] = {
              {"version",    no_argument,       0,  LONG_OPT_VERSION },
@@ -125,6 +133,8 @@
              {"conn_int",   required_argument, 0,  LONG_OPT_CONN_INT },
              {"adv_period", required_argument, 0,  LONG_OPT_ADV_PERIOD },
              {"coex",       no_argument,       0,  LONG_OPT_COEX },
+             {"throughput", required_argument, 0,  LONG_OPT_THROUGHPUT},
+             {"report",     required_argument, 0,  LONG_OPT_REPORT},
              {0,           0,                 0,  0  }};
 
 // The advertising set handle allocated from Bluetooth stack.
@@ -134,7 +144,7 @@ static uint8_t advertising_set_handle = 0xff;
 uint16_t gattdb_session;
 
 #define VERSION_MAJ	2u
-#define VERSION_MIN	9u
+#define VERSION_MIN	10u
 
 #define TRUE   1u
 #define FALSE  0u
@@ -200,7 +210,8 @@ static enum ps_states {
 
 /* application state machine */
 static enum app_states {
-  adv_test,
+  adv_test_advertising,
+  adv_test_connected,
   dtm_rx_begin,
   dtm_tx_begin,
   dtm_rx_started,
@@ -213,6 +224,44 @@ static enum app_states {
   conn_pending,
   connected
 } app_state =   default_state;
+
+/*
+   Enumeration of possible throughput states
+ */
+enum throughput_states {
+  THROUGHPUT_NONE,   // default state
+  THROUGHPUT_CONNECT,
+  THROUGHPUT_FIND_SERVICES,  // find throughput service
+  THROUGHPUT_FIND_CHARACTERISTICS,  // find throughput control&data attributes
+  THROUGHPUT_NOACK,  // Running throughput test no ACK
+  THROUGHPUT_ACK,   // Running throughput test with ACK
+} throughput_state = THROUGHPUT_NONE;
+void throughput_change_state(enum throughput_states new_state);
+
+static uint8_t bletest_throughput_ack = false;
+
+//Throughput handles
+static uint32_t bletest_throughput_service_handle = 0xFFFFFFFF;
+static uint16_t bletest_throughput_write_with_response_handle = 0xFFFF;
+static uint16_t bletest_throughput_write_no_response_handle = 0xFFFF;
+
+#define UUID_LEN                                    16
+
+// these are defined in app_gattdb.c
+extern const uint8_t bletest_throughput_service_uuid[];
+extern const uint8_t bletest_throughput_write_with_response_characteristic_uuid[];
+extern const uint8_t bletest_throughput_write_no_response_characteristic_uuid[];
+
+static void process_procedure_complete_event(sl_bt_msg_t *evt);
+static void check_characteristic_uuid(sl_bt_msg_t *evt);
+
+uint8_t bletest_throughput_payload_data[244] = { 0, };
+
+uint64_t bletest_throughput_total_bytes = 0;
+
+void timer_on_report(void);
+
+#define REPORT_TIMER_HANDLE 42u //random number for timer handle
 
 #define MAX_CUST_BGAPI_STRING_LEN  16u
 uint8_t cust_bgapi_data[MAX_CUST_BGAPI_STRING_LEN/2]; //half of string length due to ascii hex data in string
@@ -238,7 +287,9 @@ static uint32_t rssi_count;
 
 static size_t ctune_ret_len;
 
-static int64_t start_time_us;
+static int64_t start_time_us=0;
+static int64_t last_send_time_us=0;
+static int64_t last_report_time_us=0;
 
 /* Store NCP version information */
 static uint8_t version_major;
@@ -255,6 +306,8 @@ static uint16_t conn_interval=CONN_INTERVAL_DEFAULT; //connection interval for c
 #define SUP_TIMEOUT_VAL_MIN 10u //minimum timeout value in API
 
 static uint8_t coex_enabled=false;
+
+static uint16_t map_interval_ms=0;
 
 static void print_address(bd_addr address);
 static void initiate_connection(void);
@@ -408,8 +461,8 @@ void app_init(int argc, char *argv[])
         break;
 
       case LONG_OPT_ADV:
-        /* advertise test for TIS / TRP */
-        app_state = adv_test;
+        /* advertise test for TIS / TRP and connection testing */
+        app_state = adv_test_advertising;
         break;
 
       case LONG_OPT_CUST:
@@ -509,6 +562,19 @@ void app_init(int argc, char *argv[])
         coex_enabled = true;
         break;
 
+      case LONG_OPT_THROUGHPUT:
+        /* enable throughput when connecting as a central */
+        throughput_state = THROUGHPUT_CONNECT;
+        if (atoi(optarg) != 0) {
+          bletest_throughput_ack = true;
+        }
+        break;
+
+      case LONG_OPT_REPORT:
+        /* set the report interval */
+        map_interval_ms = atoi(optarg);
+        break;
+
       // Process options for other modules.
       default:
         sc = ncp_host_set_option((char)opt, optarg);
@@ -553,11 +619,31 @@ void app_process_action(void)
   // This is called infinitely.                                              //
   // Do not call blocking functions from here!                               //
   /////////////////////////////////////////////////////////////////////////////
+  sl_status_t sc;
   if (app_state == advscan_run && duration_usec != 0) {
     // Check for advscan timeout here (deinit to stop, print, exit)
     if (cur_time_us() > start_time_us + duration_usec ) {
       app_deinit();
     }
+  }
+
+  // if we are in throughput noack mode, write values as fast as possible
+  if (throughput_state == THROUGHPUT_NOACK && bletest_throughput_ack == false ) {
+      if (cur_time_us() > last_send_time_us + 1000) {
+        // send notifications from central to peripheral if enabled
+        uint16_t bytes_written;
+        printf(".");
+        fflush(stdout);
+        sc = sl_bt_gatt_write_characteristic_value_without_response(conn_handle,
+                                                  bletest_throughput_write_no_response_handle,
+                                                  sizeof(bletest_throughput_payload_data),
+                                                  bletest_throughput_payload_data,
+                                                  &bytes_written);
+        app_assert_status(sc);
+        last_send_time_us = cur_time_us();
+        bletest_throughput_total_bytes += sizeof(bletest_throughput_payload_data);
+      }
+
   }
 }
 
@@ -611,18 +697,20 @@ void app_deinit(void)
   } else if (app_state == advscan_run) {
     // Turn off scan and print the number of scan results received
     printf("Exiting scan mode, total scan packets received = %u\r\n", scan_counter);
-    sl_bt_scanner_stop();
-  } else if (app_state == connected) {
-    // clean up connetion if connected as central
+    sc = sl_bt_scanner_stop();
+    app_assert_status(sc);
+  } else if (app_state == connected || app_state == adv_test_connected) {
+    // clean up connetion if connected
     printf("Disconnecting...\r\n");
     start_time = time(NULL);
     sc = sl_bt_connection_close(conn_handle);
+    app_log_debug("sl_bt_connection_close, status=0x%x\r\n", sc);
     do {
       sc = sl_bt_pop_event(&evt);
-
+      app_log_debug("sl_bt_pop_event, status=0x%x\r\n", sc);
       if (sc == SL_STATUS_OK) {
         if (SL_BGAPI_MSG_ID(evt.header) == sl_bt_evt_connection_closed_id) {
-          printf("Disconnected from central\r\n");
+          printf("Disconnected!\r\n");
           exitwhile = true;
         }
       }
@@ -633,8 +721,12 @@ void app_deinit(void)
 
     } while (exitwhile == false);
     print_packet_counters();
+  } else if (app_state == adv_test_advertising) {
+    printf("Stopping advertisements...\r\n");
+    sc = sl_bt_advertiser_stop(advertising_set_handle);
+    app_assert_status(sc);
   }
-  if (app_state == adv_test || app_state == connected || app_state == conn_pending \
+  if (app_state == adv_test_connected || app_state == adv_test_advertising || app_state == connected || app_state == conn_pending \
         || app_state == conn_initiate) {
     app_log_debug("Supervision timeout count: %d\r\n", timeout_count);
     if (coex_enabled == true) {
@@ -703,22 +795,51 @@ void sl_bt_on_event(sl_bt_msg_t *evt)
       // Initialize GATT database dynamically.
       initialize_gatt_database();
 
+      if (throughput_state != THROUGHPUT_NONE) {
+        /* Init test data buffer with alphabet pattern */
+        for (int i=0; i < (sizeof(bletest_throughput_payload_data)/sizeof(*bletest_throughput_payload_data)); i++){
+          bletest_throughput_payload_data[i] = 'a' + (i % 26);
+        }
+      }
+
       main_app_handler();
       break;
 
     // -------------------------------
     // This event indicates that a new connection was opened.
     case sl_bt_evt_connection_opened_id:
+
       printf("Connection opened." APP_LOG_NL);
       // reset connection packet debug counters
       sc = sl_bt_system_get_counters(true, &null_var, &null_var,
                                     &null_var, &null_var);
+      
+      sc = sl_bt_connection_set_preferred_phy(conn_handle,
+                                              selected_phy,
+                                              0xff);
       // get connection RSSI
       sc = sl_bt_connection_get_rssi(evt->data.evt_connection_opened.connection);
       app_assert_status(sc);
       if (app_state == conn_pending) {
         // handle connection mode as central
         app_state = connected;
+        if (throughput_state != THROUGHPUT_NONE) {
+        sc = sl_bt_gatt_discover_primary_services_by_uuid(conn_handle,
+                                                        UUID_LEN,
+                                                        bletest_throughput_service_uuid);
+        app_assert_status(sc);     
+        throughput_state = THROUGHPUT_FIND_SERVICES;              
+        }
+      } else if (app_state == adv_test_advertising) {
+        app_state = adv_test_connected;
+        conn_handle = evt->data.evt_connection_opened.connection;
+      }
+      if (map_interval_ms != 0) {
+        sc = sl_bt_system_set_lazy_soft_timer((uint32_t) 32 * map_interval_ms,
+                                          0,
+                                          REPORT_TIMER_HANDLE,
+                                          false);
+        app_assert_status(sc);
       }
       break;
 
@@ -729,6 +850,12 @@ void sl_bt_on_event(sl_bt_msg_t *evt)
     // -------------------------------
     // This event indicates that a connection was closed.
     case sl_bt_evt_connection_closed_id:
+    // first stop report timer
+      sc = sl_bt_system_set_lazy_soft_timer((uint32_t) 0u,
+                                          0,
+                                          REPORT_TIMER_HANDLE,
+                                          false);
+      app_assert_status(sc);
       printf("Disconnected from central" APP_LOG_NL);
       app_log_debug("Disconnect reason:0x%2x\r\n",evt->data.evt_connection_closed.reason);
       print_packet_counters();
@@ -738,7 +865,7 @@ void sl_bt_on_event(sl_bt_msg_t *evt)
       }
 
       // Restart advertising after client has disconnected.
-      if (app_state == adv_test)
+      if (app_state == adv_test_connected)
       {
         sc = sl_bt_advertiser_start(
           advertising_set_handle,
@@ -746,9 +873,10 @@ void sl_bt_on_event(sl_bt_msg_t *evt)
           sl_bt_advertiser_connectable_scannable);
         app_assert_status(sc);
         printf("Started advertising." APP_LOG_NL);
+        app_state = adv_test_advertising;
       } else if (app_state == connected)
       {
-        // we were connected, so try to reconnect
+        // we were connected as central, so try to reconnect
         initiate_connection();
       }
       break;
@@ -792,14 +920,14 @@ void sl_bt_on_event(sl_bt_msg_t *evt)
         }
         break;
 
-      case sl_bt_evt_scanner_scan_report_id:
+      case sl_bt_evt_scanner_legacy_advertisement_report_id:
         if (scan_filt_flag == true) {
-          if (evt->data.evt_scanner_scan_report.address.addr[5] != scan_filt_address.addr[5] ||
-            evt->data.evt_scanner_scan_report.address.addr[4] != scan_filt_address.addr[4] ||
-            evt->data.evt_scanner_scan_report.address.addr[3] != scan_filt_address.addr[3] ||
-            evt->data.evt_scanner_scan_report.address.addr[2] != scan_filt_address.addr[2] ||
-            evt->data.evt_scanner_scan_report.address.addr[1] != scan_filt_address.addr[1] ||
-            evt->data.evt_scanner_scan_report.address.addr[0] != scan_filt_address.addr[0] )
+          if (evt->data.evt_scanner_legacy_advertisement_report.address.addr[5] != scan_filt_address.addr[5] ||
+            evt->data.evt_scanner_legacy_advertisement_report.address.addr[4] != scan_filt_address.addr[4] ||
+            evt->data.evt_scanner_legacy_advertisement_report.address.addr[3] != scan_filt_address.addr[3] ||
+            evt->data.evt_scanner_legacy_advertisement_report.address.addr[2] != scan_filt_address.addr[2] ||
+            evt->data.evt_scanner_legacy_advertisement_report.address.addr[1] != scan_filt_address.addr[1] ||
+            evt->data.evt_scanner_legacy_advertisement_report.address.addr[0] != scan_filt_address.addr[0] )
            {
             // scan doesn't match the filter - discard
             break;
@@ -809,12 +937,12 @@ void sl_bt_on_event(sl_bt_msg_t *evt)
         // print scan packet info if not averaging
         if (rssi_len == 0) {
           printf("ADV RCVD from MAC ");
-	        print_address(evt->data.evt_scanner_scan_report.address);
-          printf(", Channel: %d",evt->data.evt_scanner_scan_report.channel);
-			    printf(", RSSI: %d\r\n", evt->data.evt_scanner_scan_report.rssi);
+	        print_address(evt->data.evt_scanner_legacy_advertisement_report.address);
+          printf(", Channel: %d",evt->data.evt_scanner_legacy_advertisement_report.channel);
+			    printf(", RSSI: %d\r\n", evt->data.evt_scanner_legacy_advertisement_report.rssi);
         } else {
           // Handle averaging
-          rssi_sum += evt->data.evt_scanner_scan_report.rssi;
+          rssi_sum += evt->data.evt_scanner_legacy_advertisement_report.rssi;
           rssi_count++;
           if (rssi_count >= rssi_len) {
             // print average and reset totals
@@ -839,9 +967,43 @@ void sl_bt_on_event(sl_bt_msg_t *evt)
       app_log_debug("MTU exchanged, MTU:%d\r\n", evt->data.evt_gatt_mtu_exchanged.mtu);
       break;
 
-    case sl_bt_evt_connection_remote_used_features_id:
+    case sl_bt_evt_gatt_procedure_completed_id:
+      process_procedure_complete_event(evt);
+      break;
+
+    case sl_bt_evt_gatt_characteristic_id:
+      check_characteristic_uuid(evt);
+      break;
+    
+    case sl_bt_evt_system_soft_timer_id:
+      if (evt->data.evt_system_soft_timer.handle == REPORT_TIMER_HANDLE){
+        timer_on_report();
+      }
+      break;
+
+    case sl_bt_evt_gatt_service_id:
+      if (evt->data.evt_gatt_service.uuid.len == UUID_LEN) {
+        if (memcmp(bletest_throughput_service_uuid, evt->data.evt_gatt_service.uuid.data, UUID_LEN) == 0) {
+          bletest_throughput_service_handle = evt->data.evt_gatt_service.service;
+        }
+      }
+      break;
+    
+    case sl_bt_evt_gatt_server_attribute_value_id:
+      // receiving throughput data as server - show something
+      printf(".");
+      fflush(stdout);
+      break;
+
     case sl_bt_evt_connection_phy_status_id:
+      // report phy changes
+      app_log_info("PHY update procedure completed, new phy = 0x%x\r\n", (uint8_t) evt->data.evt_connection_phy_status.phy);
+
+    break;
+
+    case sl_bt_evt_connection_remote_used_features_id:
     case sl_bt_evt_connection_tx_power_id:
+    case sl_bt_evt_gatt_characteristic_value_id: // receives notifications from central
       // Do nothing
       break;
 
@@ -1015,7 +1177,7 @@ void main_app_handler(void) {
     if (duration_usec != 0) {
       usleep(duration_usec);	/* sleep during test */
     } else {
-        // Infinte mode
+        // Infinite mode
         printf("Infinite mode. Press control-c to exit...\r\n");
         while(1) {
           // wait here for control-c, sleeping periodically to save host CPU cycles
@@ -1025,7 +1187,7 @@ void main_app_handler(void) {
     sc = sl_bt_test_dtm_end();
     app_assert_status(sc);
   }
-  else if (app_state == adv_test)
+  else if (app_state == adv_test_advertising)
   {
     /* begin advertisement test */
     printf("\nStarting advertisements at period = %dms\r\n", (uint16_t) (adv_period * ADV_INTERVAL_UNIT));
@@ -1082,7 +1244,8 @@ void main_app_handler(void) {
     } else {
       printf("No RSSI averaging - info from every packet will be printed\r\n");
     }
-    sl_bt_scanner_start(1u,sl_bt_scanner_discover_observation); // scan with 1M PHY
+    sc = sl_bt_scanner_start(1u,sl_bt_scanner_discover_observation); // scan with 1M PHY
+    app_assert_status(sc);
     if (duration_usec == 0) {
       // infinite mode
       printf("Infinite mode. Press control-c to exit.\r\n");
@@ -1124,7 +1287,7 @@ void main_app_handler(void) {
       usleep(duration_usec);	/* sleep during test */
     } else {
       while(1) {
-        // Infinte mode
+        // Infinite mode
         // wait here for control-c, sleeping periodically
         usleep(1000);
       }
@@ -1132,6 +1295,7 @@ void main_app_handler(void) {
     sc = sl_bt_test_dtm_end();
     app_assert_status(sc);
   }
+
 }
 
 void print_address(bd_addr address)
@@ -1185,6 +1349,8 @@ static void initiate_connection(void) {
                                             0u,//min_ce_length
                                             0xffff);//max_ce_length
   app_assert_status(sc);
+
+  // proceed with connection using sl_bt_gap_phy_1m
   sc = sl_bt_connection_open(conn_address,
                              sl_bt_gap_public_address,
                             sl_bt_gap_phy_1m,
@@ -1234,4 +1400,115 @@ void print_coex_counters(void) {
            coex_counters.low_pri_denied,coex_counters.high_pri_denied,
            coex_counters.low_pri_tx_abort, coex_counters.high_pri_tx_abort);
  }
+}
+
+
+// Helper function to make the discovery and subscribing flow correct.
+// Excerpted from throughput_central.c
+static void process_procedure_complete_event(sl_bt_msg_t *evt)
+{
+  uint16_t procedure_result =  evt->data.evt_gatt_procedure_completed.result;
+  sl_status_t sc;
+
+  switch (throughput_state) {
+    case THROUGHPUT_FIND_SERVICES:
+      app_assert_status(procedure_result);
+      if (!procedure_result) {
+        // Discover successful, start characteristic discovery.
+        sc = sl_bt_gatt_discover_characteristics(conn_handle, bletest_throughput_service_handle);
+        app_assert_status(sc);
+        throughput_state = THROUGHPUT_FIND_CHARACTERISTICS;
+      }
+      break;
+    case THROUGHPUT_FIND_CHARACTERISTICS:
+      app_assert_status(procedure_result);
+      if (!procedure_result) {
+        if (bletest_throughput_write_with_response_handle != 0xFFFF && bletest_throughput_write_no_response_handle != 0xFFFF) {
+          last_report_time_us = cur_time_us();
+          if (bletest_throughput_ack == true) {
+            throughput_state = THROUGHPUT_ACK;
+                      printf("Running throughput test with ack\r\n");
+            // write with response (next write is handled by the procedure complete event)
+            sc = sl_bt_gatt_write_characteristic_value(conn_handle,
+                                                      bletest_throughput_write_with_response_handle,
+                                                      sizeof(bletest_throughput_payload_data),
+                                                      bletest_throughput_payload_data);
+            app_assert_status(sc);
+          } else if (bletest_throughput_ack == false) {
+            // throughput noack on the advertiser side results in enabling high throughput notifications from the central
+            throughput_state = THROUGHPUT_NOACK;
+            printf("Running throughput test with no ack (enabling notifications on central)\r\n");
+          } 
+        } else {
+          printf("BLEtest throughput characteristics not found - skipping throughput test\r\n");
+          throughput_state = THROUGHPUT_NONE;
+        }
+      }
+    break;
+
+    case THROUGHPUT_ACK:
+    app_assert_status(procedure_result);
+      if (!procedure_result) {
+        if (bletest_throughput_write_with_response_handle != 0xFFFF && bletest_throughput_write_no_response_handle != 0xFFFF) {
+          bletest_throughput_total_bytes += sizeof(bletest_throughput_payload_data);
+          printf(".");
+          fflush(stdout);
+          sc = sl_bt_gatt_write_characteristic_value(conn_handle,
+                                                    bletest_throughput_write_with_response_handle,
+                                                    sizeof(bletest_throughput_payload_data),
+                                                    bletest_throughput_payload_data);
+          app_assert_status(sc);
+        }
+      }
+      break;
+
+    case THROUGHPUT_NONE:
+    case THROUGHPUT_NOACK:
+    case THROUGHPUT_CONNECT:
+    default:
+      printf("DEBUG: hit default case in process_procedure_complete_event\r\n");
+      break;
+  }
+}
+
+// Check if found characteristic matches the UUIDs that we are searching for.
+static void check_characteristic_uuid(sl_bt_msg_t *evt)
+{
+  if (evt->data.evt_gatt_characteristic.uuid.len == UUID_LEN) {
+    if (memcmp(bletest_throughput_write_with_response_characteristic_uuid, evt->data.evt_gatt_characteristic.uuid.data, UUID_LEN) == 0) {
+      bletest_throughput_write_with_response_handle = evt->data.evt_gatt_characteristic.characteristic;
+      app_log_debug("bletest_throughput_write_with_response_handle=0x%x\r\n", bletest_throughput_write_with_response_handle);
+    } else if (memcmp(bletest_throughput_write_no_response_characteristic_uuid, evt->data.evt_gatt_characteristic.uuid.data, UUID_LEN) == 0) {
+      bletest_throughput_write_no_response_handle = evt->data.evt_gatt_characteristic.characteristic;
+      app_log_debug("bletest_throughput_write_no_response_handle=0x%x\r\n", bletest_throughput_write_no_response_handle);
+    } 
+  }
+}
+/**************************************************************************//**
+ * Event handler for report
+ *****************************************************************************/
+void timer_on_report(void)
+{
+  sl_status_t sc;
+  unsigned char channel_map[5];
+  size_t map_size;
+  int64_t elapsed_time_us;
+  uint32_t sent_bits;
+    sc = sl_bt_connection_read_channel_map(conn_handle,
+                                            sizeof(channel_map),
+                                             &map_size,
+                                            channel_map);
+    app_assert_status(sc);
+    app_log_info("\r\nChannel Map: 0x%x[4] 0x%x[3] 0x%x[2] 0x%x[1] 0x%x[0]" \
+            APP_LOG_NL,channel_map[4],channel_map[3],channel_map[2],
+            channel_map[1],channel_map[0]);
+    if (throughput_state != THROUGHPUT_NONE) {
+      // also print throughput since last report if running
+      elapsed_time_us = cur_time_us() - last_report_time_us;
+      sent_bits = bletest_throughput_total_bytes * 8;
+      app_log_info("Throughput since last report: %0.2f bps\r\n", ((float) (sent_bits * 1e6) / (float) (elapsed_time_us)));
+      // reset for next report
+      last_report_time_us = cur_time_us();
+      bletest_throughput_total_bytes = 0;
+    }
 }

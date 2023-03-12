@@ -64,6 +64,7 @@ typedef struct characteristic_s{
 typedef enum {
   GENERIC_ACCESS,
   DEVICE_INFORMATION,
+  BLETEST_THROUGHPUT,
   SERVICES_COUNT
 } service_index_t;
 extern service_t services[SERVICES_COUNT];
@@ -75,6 +76,8 @@ typedef enum {
   APPEARANCE,
   MANUFACTURER_NAME_STRING,
   SYSTEM_ID,
+  BLETEST_THROUGHPUT_WRITE_RESPONSE_CHAR,
+  BLETEST_THROUGHPUT_WRITE_CHAR,
   CHARACTERISTICS_COUNT
 } characteristic_index_t;
 extern characteristic_t characteristics[CHARACTERISTICS_COUNT];

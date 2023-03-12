@@ -38,6 +38,10 @@
 uint8_t generic_access_service_uuid[] = { 0x00, 0x18 };
 uint8_t device_information_service_uuid[] = { 0x0A, 0x18 };
 
+// f7fe5868-7cd9-4950-9526-d8f88527ff34 - BLEtest throughput service UUID
+const uint8_t bletest_throughput_service_uuid[] = {0x34, 0xff, 0x27, 0x85, 0xf8, 0xd8, 0x26, 0x95, 
+              0x50, 0x49, 0xd9, 0x7c, 0x68, 0x58, 0xfe, 0xf7};
+
 service_t services[SERVICES_COUNT] = {
   {
     // GENERIC_ACCESS
@@ -54,6 +58,14 @@ service_t services[SERVICES_COUNT] = {
     .uuid_len = sizeof(device_information_service_uuid),
     .uuid = device_information_service_uuid,
     .handle = 0xFFFF
+  },
+  {
+    // Silabs throughput
+    .type = sl_bt_gattdb_primary_service,
+    .property = GATTDB_ADVERTISED_SERVICE_NONE,
+    .uuid_len = sizeof(bletest_throughput_service_uuid),
+    .uuid = (uint8_t *) bletest_throughput_service_uuid,
+    .handle = 0xFFFF
   }
 };
 
@@ -67,6 +79,17 @@ uint8_t manufacturer_name_string_characteristic_uuid[] = { 0x29, 0x2A };
 char manufacturer_name_string_characteristic_value[] = "Silicon Labs";
 uint8_t system_id_characteristic_uuid[] = { 0x23, 0x2A };
 uint8_t system_id_characteristic_value[8];
+
+//BLEtest throughput characteristics
+
+// 7d62efb1-8afa-4c77-999d-bd48d8082c70 BLEtest write with response characteristic
+const uint8_t bletest_throughput_write_with_response_characteristic_uuid[] ={0x70, 0x2c, 0x08, 0xd8, 0x48, 0xbd, 0x9d, 0x99, 
+                          0x77, 0x4c, 0xfa, 0x8a, 0xb1, 0xef, 0x62, 0x7d};
+
+// c90cba5f-4399-40b2-a6bb-09826fa2d13c BLEtest write no response characteristic
+const uint8_t bletest_throughput_write_no_response_characteristic_uuid[] = {0x3c, 0xd1, 0xa2, 0x6f, 0x82, 0x09, 0xbb, 0xa6,
+                         0xb2, 0x40, 0x99, 0x43, 0x5f, 0xba, 0x0c, 0xc9};
+
 
 characteristic_t characteristics[CHARACTERISTICS_COUNT] = {
   {
@@ -111,7 +134,7 @@ characteristic_t characteristics[CHARACTERISTICS_COUNT] = {
     .value = (uint8_t *)&manufacturer_name_string_characteristic_value,
     .handle = 0xFFFF
   },
-  {
+   {
     // SYSTEM_ID
     .service = &services[DEVICE_INFORMATION],
     .property = SL_BT_GATTDB_CHARACTERISTIC_READ,
@@ -123,6 +146,34 @@ characteristic_t characteristics[CHARACTERISTICS_COUNT] = {
     .maxlen = sizeof(system_id_characteristic_value),
     .value_len = sizeof(system_id_characteristic_value),
     .value = system_id_characteristic_value,
+    .handle = 0xFFFF
+  },
+  {
+    // BLEtest throughput write with response
+    .service = &services[BLETEST_THROUGHPUT],
+    .property = SL_BT_GATTDB_CHARACTERISTIC_WRITE + SL_BT_GATTDB_CHARACTERISTIC_READ,
+    .security = GATTDB_SECURITY_NONE,
+    .flag = GATTDB_FLAG_NONE,
+    .uuid_len = sizeof(bletest_throughput_write_with_response_characteristic_uuid),
+    .uuid = (uint8_t *) bletest_throughput_write_with_response_characteristic_uuid,
+    .value_type = sl_bt_gattdb_variable_length_value,
+    .maxlen = 0xFF,
+    .value_len = 0,
+    .value = 0,
+    .handle = 0xFFFF
+  },
+  {
+    // BLEtest throughput write no response
+    .service = &services[BLETEST_THROUGHPUT],
+    .property = SL_BT_GATTDB_CHARACTERISTIC_READ + SL_BT_GATTDB_CHARACTERISTIC_WRITE + SL_BT_GATTDB_CHARACTERISTIC_WRITE_NO_RESPONSE,
+    .security = GATTDB_SECURITY_NONE,
+    .flag = GATTDB_FLAG_NONE,
+    .uuid_len = sizeof(bletest_throughput_write_no_response_characteristic_uuid),
+    .uuid = (uint8_t *) bletest_throughput_write_no_response_characteristic_uuid,
+    .value_type = sl_bt_gattdb_variable_length_value,
+    .maxlen = 0xFF,
+    .value_len = 0,
+    .value = 0,
     .handle = 0xFFFF
   }
 };
@@ -142,7 +193,7 @@ sl_status_t app_gattdb_add_service(uint16_t session, service_t *service)
 // Handles adding a new characteristic to a service.
 sl_status_t app_gattdb_add_characteristic(uint16_t session,
                                           characteristic_t *characteristic)
-{
+{ 
   if (characteristic->uuid_len == UUID_16_LEN) {
     sl_bt_uuid_16_t uuid;
     memcpy(uuid.data, characteristic->uuid, characteristic->uuid_len);

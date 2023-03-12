@@ -10,9 +10,9 @@ These instructions will get you a copy of the project up and running on your loc
 
 ### Prerequisites
 
-1. Blue Gecko SDK version v3.3.1 (Gecko SDK 4.0.1) or greater installed via Simplicity Studio v5 or from github. *NOTE: This tool is no longer compatible with Blue Gecko SDK version 2.x. For 2.x compatibility, revert to previous 1.x versions of BLEtest.*
+1. Blue Gecko SDK version v4.0 (Gecko SDK 4.1.0) or greater installed via Simplicity Studio v5 or from github. *NOTE: This tool is no longer compatible with Blue Gecko SDK version 2.x. For 2.x compatibility, revert to previous 1.x versions of BLEtest.*
 2. Linux/Posix build environment (OSX, Raspberry Pi, etc.) or Windows (Cygwin/MinGW).
-3. Blue Gecko / Mighty Gecko device running a serial UART NCP (Network Co-Processor) firmware image from Bluetooth SDK v3.3.1 (Gecko SDK 4.0.1) or greater. See the "To Run" section below for more details. *NOTE: If using Gecko SDK 4.1 or greater, you must remove the "Legacy Advertising", "Extended Advertising", and "Periodic Advertising" components from the NCP firmware prior to building, otherwise running BLEtest will result in an assert.*
+3. Blue Gecko / Mighty Gecko device running a serial UART NCP (Network Co-Processor) firmware image from Bluetooth SDK v4.0 (Gecko SDK 4.1.0) or greater. See the "To Run" section below for more details. *NOTE: To use the advertising feature in this version of BLEtest, you must remove the "Legacy Advertising", "Extended Advertising", and "Periodic Advertising" components from the NCP firmware prior to building, otherwise running BLEtest will result in an assert. The advertising scan functionality also requires the "Scanner for legacy advertisements" component to be present in the NCP firmware.*
 
 ### Installing
 
@@ -31,7 +31,7 @@ $ make
 
 #### For Raspberry Pi
 
-1. Clone Gecko SDK (4.0.1 or higher) to the Raspberry Pi.
+1. Clone Gecko SDK (4.1.0 or higher) to the Raspberry Pi.
 
 ```
 $ git clone https://github.com/SiliconLabs/gecko_sdk.git
@@ -57,32 +57,34 @@ BLEtest -u <serial port>
 
 Arguments:
 ```
--h          Print help message
+-h                      Print help message
 -u <UART port name>
 -t <tcp address>
 -b <baud_rate, default 115200>
--f            Enable hardware flow control
---version     Print version number defined in application.
---time        <duration of test in milliseconds>, 0 for infinite mode (exit with control-c)
+-f                      Enable hardware flow control
+--version               Print version number defined in application.
+--time   <duration ms>      Set time for test in milliseconds, 0 for infinite mode (exit with control-c)
 --packet_type <payload/modulation type, 0:PBRS9 packet payload, 1:11110000 packet payload, 2:10101010 packet payload, 4:111111 packet payload, 5:00000000 packet payload, 6:00001111 packet payload, 7:01010101 packet payload, 253:PN9 continuously modulated, 254:unmodulated carrier>
---power       <power level in 0.1dBm steps>
---channel     <channel, 2402 MHz + 2*channel>
---len         <packet length, ignored for unmodulated carrier>
---rx          DTM receive test. Prints number of received DTM packets.
---ctune_set   <Set 16-bit crystal tuning value, e.g. 0x0136>
---addr_set    <Set 48-bit MAC address, e.g. 01:02:03:04:05:06>
---ctune_get   Read 16-bit crystal tuning value
---fwver_get   Read FW revision string from Device Information (GATT)
---adv         Enter an advertisement mode with scan response for TIS/TRP chamber and connection testing (default period = 100ms)
---adv_period  <Advertising period for the advertisement mode, in units of 0.625ms>
---cust        <ASCII hex command string> Allows verification/running custom BGAPI commands.
---phy         <PHY selection for test packets/waveforms/RX mode, 1:1Mbps, 2:2Mbps, 3:125k LR coded, 4:500k LR coded.>
---advscan     Return RSSI, channel, and MAC address for advertisement scan results
---advscan=<optional MAC address for filtering, e.g. 01:02:03:04:05:06>
---rssi_avg    <number of packets to include in RSSI average reports for advscan>
---conn        <connect as central to 48-bit MAC address, e.g. 01:02:03:04:05:06>
---conn_int    <connection interval of central connection, in units of 1.25ms>
---coex        Enable coexistence on the target if available
+--power  <power level>      Set power level for test in 0.1dBm steps
+--channel <channel index>   Set channel index for test, frequency=2402 MHz + 2*channel>
+--len <test packet length>  Set test packet length, ignored for unmodulated carrier>
+--rx                        TM receive test. Prints number of received DTM packets.
+--ctune_set <ctune val>     Set 16-bit crystal tuning value, e.g. 0x0136
+--addr_set  <MAC>           Set 48-bit MAC address, e.g. 01:02:03:04:05:06
+--ctune_get                 Read 16-bit crystal tuning value
+--fwver_get                 Read FW revision string from Device Information (GATT)
+--adv                       Enter an advertisement mode with scan response for TIS/TRP chamber and connection testing (default period = 100ms)
+--adv_period  <period>      Set advertising period for the advertisement mode, in units of 0.625ms
+--cust <ASCII hex string>   Allows verification/running custom BGAPI commands.
+--phy  <PHY selection for test packets/waveforms/RX mode, 1:1Mbps, 2:2Mbps, 3:125k LR coded, 4:500k LR coded.>
+--advscan                   Return RSSI, channel, and MAC address for advertisement scan results
+--advscan=<MAC>             Set optional MAC address for advertising scan filtering, e.g. 01:02:03:04:05:06
+--rssi_avg <number of packets to include in RSSI average reports for advscan>
+--conn=<MAC>                Connect as central to 48-bit MAC address, e.g. 01:02:03:04:05:06
+--conn_int <conn interval>  Set connection interval for central connection, in units of 1.25ms
+--coex                      Enable coexistence on the target if available
+--throughput <0 or 1>       Push dummy throughput data when connected as central to another unit running BLEtest as an advertiser, with ack (1) or without ack (0)
+--report  <interval>        Print the channel map and throughput (if applicable) at the specified interval in milliseconds
 ```
 
 Refer to the [Blue Gecko API documentation](https://docs.silabs.com/bluetooth/latest/) for more details about the various arguments.
@@ -94,7 +96,7 @@ $ ./exe/BLEtest -u /dev/ttyACM0
 ------------------------
 Waiting for boot pkt...
 
-boot pkt rcvd: gecko_evt_system_boot(3, 3, 2, 406, 0x       0, 1)
+boot pkt rcvd: gecko_evt_system_boot(4, 1, 0, 273, 0x       0, 257)
 MAC address: 90:FD:9F:7B:53:23
 Outputting modulation type 0xFE for 0 ms at 2402 MHz at 5.0 dBm, phy=0x01
 Infinite mode. Press control-c to exit...
@@ -111,7 +113,7 @@ $ ./exe/BLEtest --time 10000 --packet_type 254 --power 50 -u /dev/ttyACM0 --chan
 ------------------------
 Waiting for boot pkt...
 
-boot pkt rcvd: gecko_evt_system_boot(3, 2, 2, 267, 0x 1090002, 1)
+boot pkt rcvd: gecko_evt_system_boot(4, 1, 0, 273, 0x       0, 257)
 MAC address: 00:0D:6F:20:B2:D6
 Outputting modulation type 0xFE for 10000 ms at 2402 MHz at 5.0 dBm, phy=0x01
 DTM completed, number of packets transmitted: 0
@@ -124,7 +126,7 @@ $ ./exe/BLEtest --time 10000 --packet_type 0 --power 80 -u /dev/ttyACM0 --channe
 ------------------------
 Waiting for boot pkt...
 
-boot pkt rcvd: gecko_evt_system_boot(3, 2, 4, 297, 0x 1090002, 1)
+boot pkt rcvd: gecko_evt_system_boot(4, 1, 0, 273, 0x       0, 257)
 MAC address: 00:0D:6F:08:62:3F
 Outputting modulation type 0x00 for 10000 ms at 2404 MHz at 8.0 dBm, phy=0x01
 DTM completed, number of packets transmitted: 16014
@@ -137,7 +139,7 @@ $ ./exe/BLEtest --time 20000 --rx -u /dev/ttyACM0 --channel 1
 ------------------------
 Waiting for boot pkt...
 
-boot pkt rcvd: gecko_evt_system_boot(3, 2, 2, 267, 0x 1090002, 1)
+boot pkt rcvd: gecko_evt_system_boot(4, 1, 0, 273, 0x       0, 257)
 MAC address: 00:0D:6F:20:B2:D6
 DTM receive enabled, freq=2404 MHz
 DTM receive completed. Number of packets received: 16214
@@ -150,12 +152,12 @@ $ ./exe/BLEtest -u /dev/ttyACM1 --addr_set 01:02:03:04:05:06 --time 1
 ------------------------
 Waiting for boot pkt...
 
-boot pkt rcvd: gecko_evt_system_boot(3, 3, 2, 406, 0x       0, 1)
+boot pkt rcvd: gecko_evt_system_boot(4, 1, 0, 273, 0x       0, 257)
 MAC address: 01:02:03:04:05:06
 Writing MAC address: 01:02:03:04:05:06
 Rebooting with new MAC address...
 
-boot pkt rcvd: gecko_evt_system_boot(3, 3, 2, 406, 0x       0, 1)
+boot pkt rcvd: gecko_evt_system_boot(4, 1, 0, 273, 0x       0, 257)
 MAC address: 01:02:03:04:05:06
 Outputting modulation type 0xFE for 1 ms at 2402 MHz at 5.0 dBm, phy=0x01
 DTM completed, number of packets transmitted: 0
@@ -168,11 +170,11 @@ $ ./exe/BLEtest -u /dev/ttyACM0 --ctune_set 0x0155 --packet_type 254 --time 1000
 ------------------------
 Waiting for boot pkt...
 
-boot pkt rcvd: gecko_evt_system_boot(3, 2, 2, 267, 0x 1090002, 1)
+boot pkt rcvd: gecko_evt_system_boot(4, 1, 0, 273, 0x       0, 257)
 MAC address: 00:0D:6F:20:B2:D6
 Writing ctune value to 0x0155
 Rebooting with new ctune value...
-boot pkt rcvd: gecko_evt_system_boot(3, 2, 2, 267, 0x 1090002, 1)
+boot pkt rcvd: gecko_evt_system_boot(4, 1, 0, 273, 0x       0, 257)
 MAC address: 00:0D:6F:20:B2:D6
 Outputting modulation type 0xFE for 10000 ms at 2402 MHz at 5.0 dBm, phy=0x01
 DTM completed, number of packets transmitted: 0
@@ -185,7 +187,7 @@ $ ./exe/BLEtest -u /dev/ttyACM0 --cust 01
 ------------------------
 Waiting for boot pkt...
 
-boot pkt rcvd: gecko_evt_system_boot(3, 2, 2, 267, 0x 1090002, 1)
+boot pkt rcvd: gecko_evt_system_boot(4, 1, 0, 273, 0x       0, 257)
 MAC address: 00:0D:6F:20:B2:D6
 Sending custom user message to target...
 BGAPI success! Returned payload (len=1): 01
@@ -198,7 +200,7 @@ $ ./exe/BLEtest -u /dev/ttyACM0 --packet_type 253 --channel 21 --power 100 --tim
 ------------------------
 Waiting for boot pkt...
 
-boot pkt rcvd: gecko_evt_system_boot(3, 2, 2, 267, 0x 1090002, 1)
+boot pkt rcvd: gecko_evt_system_boot(4, 1, 0, 273, 0x       0, 257)
 MAC address: 00:0D:6F:20:B2:D6
 Outputting modulation type 253 for 5000 ms at 2402 MHz at 10.0 dBm, phy=0x02
 Test completed!
@@ -218,7 +220,7 @@ $
  ------------------------
  Waiting for boot pkt...
 
- boot pkt rcvd: gecko_evt_system_boot(3, 3, 2, 406, 0x       0, 1)
+ boot pkt rcvd: gecko_evt_system_boot(4, 1, 0, 273, 0x       0, 257)
  MAC address: 90:FD:9F:7B:53:23
  Enabling advertising scan.
  No RSSI averaging - info from every packet will be printed
@@ -243,7 +245,7 @@ $
  ------------------------
  Waiting for boot pkt...
 
- boot pkt rcvd: gecko_evt_system_boot(3, 3, 2, 406, 0x       0, 1)
+ boot pkt rcvd: gecko_evt_system_boot(4, 1, 0, 273, 0x       0, 257)
  MAC address: 90:FD:9F:7B:53:23
  Enabling advertising scan with MAC address filter 63:61:A9:EC:76:81.
  No RSSI averaging - info from every packet will be printed
@@ -260,7 +262,7 @@ $
  ------------------------
  Waiting for boot pkt...
 
- boot pkt rcvd: gecko_evt_system_boot(3, 3, 2, 406, 0x       0, 1)
+ boot pkt rcvd: gecko_evt_system_boot(4, 1, 0, 273, 0x       0, 257)
  MAC address: 90:FD:9F:7B:53:23
  Enabling advertising scan with MAC address filter 63:61:A9:EC:76:81.
  RSSI averaging over 10 packets
