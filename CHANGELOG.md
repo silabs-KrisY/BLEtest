@@ -4,6 +4,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.10.1] - 2024-06-10
+
+### Changed
+- Modifies README.md to better describe the component selection changes required on the default NCP firmware project in order to use advertising and scanning features.
+
+### Known Issues
+- When building your NCP firmware, you must remove the "Legacy Advertising", "Extended Advertising", and "Periodic Advertising" components from the NCP firmware prior to building, otherwise running BLEtest will result in an assert.
+- When building your NCP firmware, you must make sure the "Scanner for legacy advertisements" component is present in the NCP firmware.
+
 ## [2.10.0] - 2023-03-12
 ### Added
 - Adds support for pushing payload/throughput data from the central to the peripheral when in a connection

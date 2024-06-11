@@ -12,7 +12,9 @@ These instructions will get you a copy of the project up and running on your loc
 
 1. Blue Gecko SDK version v4.0 (Gecko SDK 4.1.0) or greater installed via Simplicity Studio v5 or from github. *NOTE: This tool is no longer compatible with Blue Gecko SDK version 2.x. For 2.x compatibility, revert to previous 1.x versions of BLEtest.*
 2. Linux/Posix build environment (OSX, Raspberry Pi, etc.) or Windows (Cygwin/MinGW).
-3. Blue Gecko / Mighty Gecko device running a serial UART NCP (Network Co-Processor) firmware image from Bluetooth SDK v4.0 (Gecko SDK 4.1.0) or greater. See the "To Run" section below for more details. *NOTE: To use the advertising feature in this version of BLEtest, you must remove the "Legacy Advertising", "Extended Advertising", and "Periodic Advertising" components from the NCP firmware prior to building, otherwise running BLEtest will result in an assert. The advertising scan functionality also requires the "Scanner for legacy advertisements" component to be present in the NCP firmware.*
+3. Blue Gecko / Mighty Gecko device running a serial UART NCP (Network Co-Processor) firmware image from Bluetooth SDK v4.0 (Gecko SDK 4.1.0) or greater. See the "To Run" section below for more details.
+4. To use the advertising feature in this version of BLEtest without an assert, some component selections need to be changed from the defaults in the NCP firmware image. The following components should be removed from the NCP firmware project slcp: "Legacy Advertising", "Extended Advertising", and "Periodic Advertising". Removing these also removes the "Advertising Base Feature" which is required, so this component needs to be added back.  
+5. The advertising scan functionality requires the "Scanner for legacy advertisements" component to be present in the NCP firmware.
 
 ### Installing
 
