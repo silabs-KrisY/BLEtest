@@ -2,55 +2,55 @@
 
 This an example application that demonstrates Bluetooth Low Energy (BLE) peripheral connectivity using BGLib C function definitions. It resets the device, then reads the MAC address and executes one or more test commands. The functionality can be used for RF testing and manufacturing verification purposes.
 
-This is targeted to run on a Posix/Linux/Cygwin host. The BLE NCP can be connected to any /dev/ttyx including hardware UARTs as well as USB virtual COM ports. This includes the Silicon Labs Wireless Starter Kit (WSTK) development board (or Silicon Labs Thunderboard) connected over USB (virtual COM) with an applicable NCP firmware image programmed into the EFR32.
+This is targeted to run on a Posix/Linux/Cygwin host. The BLE NCP can be connected to any /dev/ttyx including hardware UARTs as well as USB virtual COM ports. This includes the Silicon Labs Wireless Starter Kit (WSTK) and Wireless Pro Kit (WPK) development boards as well as Silicon Labs Thunderboards and Explorer Kits connected over USB (virtual COM) with an applicable NCP firmware image programmed into the EFR32.
 
 # Getting Started
 
 These instructions will get you a copy of the project up and running on your local machine for development and testing purposes. See deployment for notes on how to deploy the project on a live system.
 
-### Prerequisites
+## Prerequisites
 
-1. Blue Gecko SDK version v4.0 (Gecko SDK 4.1.0) or greater installed via Simplicity Studio v5 or from github. *NOTE: This tool is no longer compatible with Blue Gecko SDK version 2.x. For 2.x compatibility, revert to previous 1.x versions of BLEtest.*
+1. Silicon Labs Bluetooth SDK from Gecko SDK 4.4.6 installed via Simplicity Studio or from github. 
 2. Linux/Posix build environment (OSX, Raspberry Pi, etc.) or Windows (Cygwin/MinGW).
-3. Blue Gecko / Mighty Gecko device running a serial UART NCP (Network Co-Processor) firmware image from Bluetooth SDK v4.0 (Gecko SDK 4.1.0) or greater. See the "To Run" section below for more details.
-4. To use the advertising feature in this version of BLEtest without an assert, some component selections need to be changed from the defaults in the NCP firmware image. The following components should be removed from the NCP firmware project slcp: "Legacy Advertising", "Extended Advertising", and "Periodic Advertising". Removing these also removes the "Advertising Base Feature" which is required, so this component needs to be added back.  
-5. The advertising scan functionality requires the "Scanner for legacy advertisements" component to be present in the NCP firmware.
+3. EFR32BG or EFR32MG device running a serial UART NCP (Network Co-Processor) firmware image from Gecko SDK 4.4.6 or Simplicity SDK 2024.12.2. See the "To Run" section below for more details.
 
-### Installing
+## Installing
 
-This project can be built as supplied within the Blue Gecko SDK frameworks.
+This project can be built as supplied using the Gecko SDK using Cygwin/OSX/Linux.
 
-#### For Cygwin/OSX/Linux with Gecko SDK installed
+### To Build BLEtest
 
-Clone or copy the contents of this repository into the Gecko SDK, into a subfolder of app/bluetooth/example_host. Commands shown here are from OSX using Gecko SDK Suite v4.0.2, but will be similar in Linux/Cygwin.
-
-```
-$ cd ~/SimplicityStudio/SDKs/gecko_sdk/app/bluetooth/example_host/
-$ git clone https://github.com/kryoung-silabs/BLEtest.git
-$ cd BLEtest
-$ make
-```
-
-#### For Raspberry Pi
-
-1. Clone Gecko SDK (4.1.0 or higher) to the Raspberry Pi.
+1. Clone Gecko SDK.
 
 ```
 $ git clone https://github.com/SiliconLabs/gecko_sdk.git
 ```
 
-2. Clone BLEtest to the Raspberry Pi:
+2. Checkout GSDK 4.4.6.
 ```
+$ cd gecko_sdk
+$ git checkout v4.4.6
+```
+
+3. Clone BLEtest:
+```
+$ cd ..
 $ git clone https://github.com/kryoung-silabs/BLEtest.git
 ```
-2. Cd to the BLEtest folder and invoke make, specifying the SDK root directory via the SDK_DIR parameter.
+4. Cd to the BLEtest folder and invoke make, specifying the SDK root directory via the SDK_DIR parameter.
 ```
 $ cd BLEtest
 $ make SDK_DIR=../gecko_sdk
 ```
-#### To Run
+### To Run
 
-1. Program your NCP firmware image (using either the "Bluetooth - NCP Empty" or "Bluetooth - NCP" example projects) into your target board. Instructions on how to implement this, both on custom hardware and on Silicon Labs wireless starter kit (WSTK) radio boards are provided in [AN1259: Using the v3.x Silicon Labs Bluetooth(R) Stack in Network Co-Processor Mode](https://www.silabs.com/documents/public/application-notes/an1259-bt-ncp-mode-sdk-v3x.pdf).
+1. Program your NCP firmware image (using either the "Bluetooth - NCP Empty" or "Bluetooth - NCP" example projects) into your target board. Instructions on how to implement this, both on custom hardware and on Silicon Labs wireless starter kit (WSTK) radio boards are provided in [AN1259: Using the v3.x Silicon Labs Bluetooth(R) Stack in Network Co-Processor Mode](https://www.silabs.com/documents/public/application-notes/an1259-bt-ncp-mode-sdk-v3x.pdf). NCP firmware notes:
+    * If using the Simplicity SDK to build your NCP firmware image, support for the custom Bluetooth address and HFXO CTUNE features requires enabling support in the "Bluetooth Core" component
+    ![Simplicity Studio component editor view showing enabled custom Bluetooth address and HFXO CTUNE features in the "Bluetooth Core" component](images/bluetooth_core_support_for_cust_address_and_hfxo_ctune.png)
+    * Gecko SDK 4.4.6 is recommended to build the NCP firmware for series 1 devices, while Simplicity SDK 2024.12.2 is recommended for series 2 devices.
+    * The NCP firmware project needs to have the "Legacy Advertising" component present in order to use the advertising features. This is generally added to Silicon Labs NCP firmware projects by default.
+    * The throughput test functionality is not compatibile with SSDK 2025.6.0 and higher due to a change in the GATT API in the Bluetooth SDK.
+    * The Bluetooth SDK functionality of setting HFXO CTUNE via NVM3 write is not working properly for some series 2 devices (xG22 and xG24) in GSDK 4.4.x. Simplicity SDK 2024.12.2 is recommended for series 2 devices.
 2. Connect your device running the Bluetooth NCP firmware to the host (via USB, uart, etc.).
 3. Run the host application, pointing it to the correct serial port. Note that the default serial port created when plugging a Silicon Labs WSTK or Silicon Labs Thunderboard into a Raspberry Pi is "/dev/ttyACM0". The command line usage is:
 ```
@@ -59,37 +59,53 @@ BLEtest -u <serial port>
 
 Arguments:
 ```
--h                      Print help message
--u <UART port name>
--t <tcp address>
--b <baud_rate, default 115200>
--f                      Enable hardware flow control
---version               Print version number defined in application.
---time   <duration ms>      Set time for test in milliseconds, 0 for infinite mode (exit with control-c)
---packet_type <payload/modulation type, 0:PBRS9 packet payload, 1:11110000 packet payload, 2:10101010 packet payload, 4:111111 packet payload, 5:00000000 packet payload, 6:00001111 packet payload, 7:01010101 packet payload, 253:PN9 continuously modulated, 254:unmodulated carrier>
---power  <power level>      Set power level for test in 0.1dBm steps
---channel <channel index>   Set channel index for test, frequency=2402 MHz + 2*channel>
---len <test packet length>  Set test packet length, ignored for unmodulated carrier>
---rx                        TM receive test. Prints number of received DTM packets.
---ctune_set <ctune val>     Set 16-bit crystal tuning value, e.g. 0x0136
---addr_set  <MAC>           Set 48-bit MAC address, e.g. 01:02:03:04:05:06
---ctune_get                 Read 16-bit crystal tuning value
---fwver_get                 Read FW revision string from Device Information (GATT)
---adv                       Enter an advertisement mode with scan response for TIS/TRP chamber and connection testing (default period = 100ms)
---adv_period  <period>      Set advertising period for the advertisement mode, in units of 0.625ms
---cust <ASCII hex string>   Allows verification/running custom BGAPI commands.
---phy  <PHY selection for test packets/waveforms/RX mode, 1:1Mbps, 2:2Mbps, 3:125k LR coded, 4:500k LR coded.>
---advscan                   Return RSSI, channel, and MAC address for advertisement scan results
---advscan=<MAC>             Set optional MAC address for advertising scan filtering, e.g. 01:02:03:04:05:06
---rssi_avg <number of packets to include in RSSI average reports for advscan>
---conn=<MAC>                Connect as central to 48-bit MAC address, e.g. 01:02:03:04:05:06
---conn_int <conn interval>  Set connection interval for central connection, in units of 1.25ms
---coex                      Enable coexistence on the target if available
---throughput <0 or 1>       Push dummy throughput data when connected as central to another unit running BLEtest as an advertiser, with ack (1) or without ack (0)
---report  <interval>        Print the channel map and throughput (if applicable) at the specified interval in milliseconds
+    -t  TCP/IP connection option.
+        <tcp_address>    TCP/IP address of the dev board.
+    -u  UART serial connection option.
+        <serial_port>    Serial port assigned to the dev board by the host system. (COM# on Windows, /dev/tty# on POSIX)
+    -n  AF socket connection options.
+        <server_socket>  Path to AF socket file descriptor
+    -b  Baud rate of the serial connection.
+        <baud_rate>      Baud rate, default: 115200
+    -f  Disable flow control (RTS/CTS), default: enabled
+    -l  Application log level filter.
+        <level>          Integer representing the log level, default: 3.
+        0 : Critical.
+        1 : Critical, error.
+        2 : Critical, error, warning.
+        3 : Critical, error, warning, info.
+        4 : Critical, error, warning, info, debug.
+  -h                      Print help message
+  -u <UART port name>                        
+  -t <tcp address>
+  -b <baud_rate, default 115200>
+  -f                      Enable hardware flow control
+  --version               Print version number defined in application.
+  --time   <duration ms>      Set time for test in milliseconds, 0 for infinite mode (exit with control-c)
+  --packet_type <payload/modulation type, 0:PBRS9 packet payload, 1:11110000 packet payload, 2:10101010 packet payload, 4:111111 packet payload, 5:00000000 packet payload, 6:00001111 packet payload, 7:01010101 packet payload, 253:PN9 continuously modulated, 254:unmodulated carrier>
+  --power  <power level>      Set power level for test in 0.1dBm steps
+  --channel <channel index>   Set channel index for test, frequency=2402 MHz + 2*channel>
+  --len <test packet length>  Set test packet length, ignored for unmodulated carrier>
+  --rx                        TM receive test. Prints number of received DTM packets.
+  --ctune_set <ctune val>     Set 16-bit crystal tuning value, e.g. 0x0136
+  --addr_set  <MAC>           Set 48-bit MAC address, e.g. 01:02:03:04:05:06
+  --ctune_get                 Read 16-bit crystal tuning value
+  --fwver_get                 Read FW revision string from Device Information (GATT)
+  --adv                       Enter an advertisement mode with scan response for TIS/TRP chamber and connection testing (default period = 100ms)
+  --adv_period  <period>      Set advertising period for the advertisement mode, in units of 0.625ms
+  --cust <ASCII hex string>   Allows verification/running custom BGAPI commands. Example of ASCII hex string: a50102feed
+  --phy  <PHY selection for test packets/waveforms/RX mode, 1:1Mbps, 2:2Mbps, 3:125k LR coded, 4:500k LR coded.>
+  --advscan                   Return RSSI, channel, and MAC address for advertisement scan results
+  --advscan=<MAC>             Set optional MAC address for advertising scan filtering, e.g. 01:02:03:04:05:06
+  --rssi_avg <number of packets to include in RSSI average reports for advscan>
+  --conn=<MAC>                Connect as central to 48-bit MAC address, e.g. 01:02:03:04:05:06
+  --conn_int <conn interval>  Set connection interval for central connection, in units of 1.25ms
+  --coex                      Enable coexistence on the target if available
+  --throughput <0 or 1>       Push dummy throughput data when connected as central to another unit running BLEtest as an advertiser, with ack (1) or without ack (0)
+  --report  <interval>        Print the channel map and throughput (if applicable) at the specified interval in milliseconds
 ```
 
-Refer to the [Blue Gecko API documentation](https://docs.silabs.com/bluetooth/latest/) for more details about the various arguments.
+Refer to the [Silicon Labs Bluetooth API documentation](https://docs.silabs.com/bluetooth/latest/) for more details about the various arguments.
 
 When you run with only the serial port argument, you'll get some simple default behavior:
 ```
@@ -276,6 +292,52 @@ $
  ^CExiting scan mode, total scan packets received = 49
 ```
 
+12. Throughput test - requires two separate EFR32 devices running NCP firmware and two instances of BLEtest. 
+On the first unit, run "--adv" to advertise:
+```
+$ ./exe/BLEtest -u /dev/tty.usbmodem0004402437161 --adv
+[I] Opened port on posix.
+
+------------------------
+Waiting for boot pkt...
+
+boot pkt rcvd: gecko_evt_system_boot(9, 1, 0, 65534, 0x 3000002, 258)
+MAC address: 0C:43:14:F0:2F:65
+
+Starting advertisements at period = 100ms
+Attempted power setting of 5.0 dBm, actual setting 5.0 dBm
+Press 'control-c' to end...
+```
+On the second unit, using the MAC address from the first unit, connect and run the throughput test:
+```
+$ ./exe/BLEtest --conn=0C:43:14:F0:2F:65 --throughput 1 --report 1000 -u /dev/tty.usbmodem0004402436671     
+[I] Opened port on posix.
+
+------------------------
+Waiting for boot pkt...
+
+boot pkt rcvd: gecko_evt_system_boot(9, 1, 0, 65534, 0x 3000002, 258)
+MAC address: 0C:43:14:F0:2F:8E
+Initiating connection as central with connection interval=20.000000 ms to MAC 0C:43:14:F0:2F:65
+Attempted power setting of 5.0 dBm, actual setting 5.0 dBm
+Connection opened.
+Connection RSSI: -8
+[I] PHY update procedure completed, new phy = 0x1
+[I] PHY update procedure completed, new phy = 0x1
+Running throughput test with ack
+..............[I] 
+Channel Map: 0x1f[4] 0xff[3] 0xff[2] 0xff[1] 0xff[0]
+[I] Throughput since last report: 31259.72 bps
+................[I] 
+Channel Map: 0x1f[4] 0xff[3] 0xff[2] 0xff[1] 0xff[0]
+[I] Throughput since last report: 31992.33 bps
+.................[I] 
+```
+
+## Tested Combinations
+
+This version of BLEtest was tested with the BLEtest app built from GSDK 4.4.6 and with two NCP firmware images, one built with GSDK 4.4.6 and the other built with SSDK 2024.12.2. The BLEtest host application was built with GSDK 4.4.6 in both test cases.
+
 ## Deployment
 
 For a commercially deployed system (i.e. embedded gateway, etc.), use the supplied makefile and source files from the Blue Gecko SDK to cross-compile for the desired platform.
@@ -286,7 +348,7 @@ I am a Field Applications Engineer for Silicon Labs, not a full time software de
 
 ## Versioning
 
-I plan to use [SemVer](http://semver.org/) for versioning. For the versions available, see the [tags on this repository](https://github.com/host-thermometer-client/tags). All notable changes to this project will be documented in [CHANGELOG.md](CHANGELOG.md).
+I am using [SemVer](http://semver.org/) for versioning. For the versions available, see the [tags on this repository](https://github.com/silabs-KrisY/BLEtest/tags). All notable changes to this project will be documented in [CHANGELOG.md](CHANGELOG.md).
 
 ## Authors
 

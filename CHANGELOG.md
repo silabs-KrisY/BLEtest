@@ -4,6 +4,23 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.0.0] - 2025-09-14
+
+### Added
+- Timeout support (via --time) added to advertising and connection modes
+- Added release test script
+
+### Fixed
+- Removed duplicate help message printing
+
+### Changed
+- Modified source code to use newer APIs (specifically legacy advertiser) for compatibiity with newer SDKs.
+- Modified README.md to document SDK and NCP requirements for new APIs.
+- Now exits immediately after app version retrieval and also GATT version retrieval (fwver_get)
+
+### Known Issues
+- Throughput test features do not work when using NCP from Simplicity SDK 2025.6.0 and higher due to GATT client API changes in Bluetooth SDK 10.0 (SSDK 2025.6.0). Recommend only using SSDK 2024.12.2.
+
 ## [2.10.1] - 2024-06-10
 
 ### Changed

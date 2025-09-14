@@ -143,13 +143,13 @@ static uint8_t advertising_set_handle = 0xff;
 // Handle for dynamic GATT Database session.
 uint16_t gattdb_session;
 
-#define VERSION_MAJ	2u
-#define VERSION_MIN	10u
+#define VERSION_MAJ	3u
+#define VERSION_MIN	0u
 
 #define TRUE   1u
 #define FALSE  0u
 
-#define DEFAULT_PHY test_phy_1m	//default to use 1Mbit PHY
+#define DEFAULT_PHY sl_bt_test_phy_1m	//default to use 1Mbit PHY
 
 /* Program defaults - will use these if not specified on command line */
 #ifndef DEFAULT_DURATION
@@ -210,6 +210,7 @@ static enum ps_states {
 
 /* application state machine */
 static enum app_states {
+  adv_test_advertising_wait,
   adv_test_advertising,
   adv_test_connected,
   dtm_rx_begin,
@@ -358,12 +359,12 @@ void app_init(int argc, char *argv[])
       // Print help.
       case 'h':
         app_log(USAGE, argv[0]);
-        app_log(OPTIONS);
         exit(EXIT_SUCCESS);
 
       case 'v':
       case LONG_OPT_VERSION:
         printf("%s version %d.%d\n",argv[0],VERSION_MAJ,VERSION_MIN);
+        exit(EXIT_SUCCESS);
         break;
 
       case LONG_OPT_TIME:
@@ -462,7 +463,7 @@ void app_init(int argc, char *argv[])
 
       case LONG_OPT_ADV:
         /* advertise test for TIS / TRP and connection testing */
-        app_state = adv_test_advertising;
+        app_state = adv_test_advertising_wait;
         break;
 
       case LONG_OPT_CUST:
@@ -493,8 +494,8 @@ void app_init(int argc, char *argv[])
       case LONG_OPT_PHY:
         /* Select PHY for test packets/waveforms */
         selected_phy = atoi(optarg);
-        if (selected_phy != test_phy_1m && selected_phy != test_phy_2m &&
-          selected_phy != test_phy_125k && selected_phy != test_phy_500k ) {
+        if (selected_phy != sl_bt_test_phy_1m && selected_phy != sl_bt_test_phy_2m &&
+          selected_phy != sl_bt_test_phy_125k && selected_phy != sl_bt_test_phy_500k ) {
             printf("Error! Invalid phy argument, 0x%02x\n",selected_phy);
             exit(EXIT_FAILURE);
         }
@@ -620,8 +621,9 @@ void app_process_action(void)
   // Do not call blocking functions from here!                               //
   /////////////////////////////////////////////////////////////////////////////
   sl_status_t sc;
-  if (app_state == advscan_run && duration_usec != 0) {
-    // Check for advscan timeout here (deinit to stop, print, exit)
+  if ((app_state == advscan_run || app_state ==  adv_test_advertising || app_state == adv_test_connected ||
+        app_state == connected) && duration_usec != 0) {
+    // Check for advscan, connection, or advertising timeout here (deinit to stop, print, exit)
     if (cur_time_us() > start_time_us + duration_usec ) {
       app_deinit();
     }
@@ -758,6 +760,7 @@ void sl_bt_on_event(sl_bt_msg_t *evt)
   uint8_t address_type;
   int16_t power_level_set_min, power_level_set_max;
   uint16_t null_var;
+  int8_t rssi;
 
   switch (SL_BT_MSG_ID(evt->header)) {
     // -------------------------------
@@ -818,8 +821,9 @@ void sl_bt_on_event(sl_bt_msg_t *evt)
                                               selected_phy,
                                               0xff);
       // get connection RSSI
-      sc = sl_bt_connection_get_rssi(evt->data.evt_connection_opened.connection);
+      sc = sl_bt_connection_get_median_rssi(evt->data.evt_connection_opened.connection, &rssi);
       app_assert_status(sc);
+      printf("Connection RSSI: %d\r\n", rssi);
       if (app_state == conn_pending) {
         // handle connection mode as central
         app_state = connected;
@@ -867,9 +871,8 @@ void sl_bt_on_event(sl_bt_msg_t *evt)
       // Restart advertising after client has disconnected.
       if (app_state == adv_test_connected)
       {
-        sc = sl_bt_advertiser_start(
+        sc = sl_bt_legacy_advertiser_start(
           advertising_set_handle,
-          sl_bt_advertiser_general_discoverable,
           sl_bt_advertiser_connectable_scannable);
         app_assert_status(sc);
         printf("Started advertising." APP_LOG_NL);
@@ -957,10 +960,6 @@ void sl_bt_on_event(sl_bt_msg_t *evt)
       app_log_debug("Conn params interval=%3f ms, timeout: %d ms\r\n",
                     (float)evt->data.evt_connection_parameters.interval * 1.25,
                     evt->data.evt_connection_parameters.timeout * 10);
-      break;
-
-    case sl_bt_evt_connection_rssi_id:
-      printf("Connection RSSI=%d dBm\r\n", evt->data.evt_connection_rssi.rssi);
       break;
 
     case sl_bt_evt_gatt_mtu_exchanged_id:
@@ -1072,9 +1071,9 @@ void main_app_handler(void) {
   size_t user_message_response_len;
   uint8_t user_message_response[50];
 
-  /* Immediately exit if not the right NCP version */
-  if ((version_major < 3) || ((version_major == 3) && (version_minor < 3) && (version_patch < 1))) {
-    printf("ERROR: This software version requires Blue Gecko NCP version 3.3.1 or higher!\n");
+  /* Immediately exit if not the right NCP version (GSDK 4.4.6 == BLE SDK 7.3.0) */
+  if ((version_major < 7) || ((version_major == 7) && (version_minor < 3))) {
+    printf("ERROR: This software version requires Blue Gecko NCP version 7.3.0 or higher!\n");
     exit(EXIT_FAILURE);
   }
 
@@ -1082,18 +1081,18 @@ void main_app_handler(void) {
       DTM outputs. Ignore and print debug message if not supported on target */
   if (coex_enabled == TRUE) {
     app_log_debug("Attempting to enable coexistence on the target\n");
-    sc = sl_bt_coex_set_options(coex_option_enable, coex_option_enable);
+    sc = sl_bt_coex_set_options(sl_bt_coex_option_enable, sl_bt_coex_option_enable);
     if (sc == SL_STATUS_OK) {
       app_log_debug("Coexistence enabled successfully!\n");
     }
   } else {
     app_log_debug("Attempting to disable coexistence on the target\n");
-    sc = sl_bt_coex_set_options(coex_option_enable, 0x0000);
+    sc = sl_bt_coex_set_options(sl_bt_coex_option_enable, 0x0000);
     if (sc == SL_STATUS_OK) {
       app_log_debug("Coexistence disabled successfully!\n");
     }
   }
-  sc = sl_bt_coex_set_options(coex_option_enable, coex_enabled ? coex_option_enable : 0);
+  sc = sl_bt_coex_set_options(sl_bt_coex_option_enable, coex_enabled ? sl_bt_coex_option_enable : 0);
   if (sc == SL_STATUS_NOT_SUPPORTED) {
     if (coex_enabled) {
       app_log_debug("Could not enable coexistence - not available in the NCP target.\n");
@@ -1119,7 +1118,7 @@ void main_app_handler(void) {
     /* read the NVM3 key for CTUNE */
     printf("Reading flash NVM3 value for CTUNE\n");
     sc = sl_bt_nvm_load(SL_BT_NVM_KEY_CTUNE, sizeof(ctune_array), &ctune_ret_len, ctune_array);
-    if (sc == SL_STATUS_BT_PS_KEY_NOT_FOUND ) {
+    if (sc == SL_STATUS_NOT_FOUND ) {
       printf("CTUNE value not loaded in PS flash!\n");
     } else if (sc) {
       app_assert_status(sc);
@@ -1136,7 +1135,7 @@ void main_app_handler(void) {
     /* Find the firmware revision string (UUID 0x2a26) in the local GATT and print it out */
     sc = sl_bt_gatt_server_find_attribute(0,FWREV_TYPE_LEN,fwrev_type_data, &attribute_handle);
     if (sc == SL_STATUS_BT_ATT_ATT_NOT_FOUND) {
-        printf("Firmware revision string not found in the local GATT.\nRebooting...\n");
+        printf("Firmware revision string not found in the local GATT.\n");
     } else if (sc)
     {
       app_assert_status(sc);
@@ -1154,9 +1153,8 @@ void main_app_handler(void) {
       printf("\n");
     }
 
-    /* Reset again and proceed with other commands (not flash commands)*/
-    ps_state = ps_none; /* reset state machine */
-    sl_bt_system_reset(sl_bt_system_boot_mode_normal);/* reset to take effect */
+    // exit gracefully
+    app_deinit();
   }
   else if (ps_state == ps_write_mac) {
     /* write MAC value and reboot */
@@ -1187,7 +1185,7 @@ void main_app_handler(void) {
     sc = sl_bt_test_dtm_end();
     app_assert_status(sc);
   }
-  else if (app_state == adv_test_advertising)
+  else if (app_state == adv_test_advertising_wait)
   {
     /* begin advertisement test */
     printf("\nStarting advertisements at period = %dms\r\n", (uint16_t) (adv_period * ADV_INTERVAL_UNIT));
@@ -1195,17 +1193,19 @@ void main_app_handler(void) {
     app_assert_status(sc);
     printf("Attempted power setting of %.1f dBm, actual setting %.1f dBm\n",(float)power_level/10,(float)power_level_set_max/10);
     printf("Press 'control-c' to end...\n");
+    printf("Advertising for %d milliseconds\r\n", duration_usec/1000);
+    start_time_us = cur_time_us();
     sc = sl_bt_advertiser_create_set(&advertising_set_handle);
     app_assert_status(sc);
-    sc = sl_bt_advertiser_set_data(advertising_set_handle, 0, sizeof(adv_data),adv_data); //advertising data
+    sc = sl_bt_legacy_advertiser_set_data(advertising_set_handle, 0, sizeof(adv_data),adv_data); //advertising data
     app_assert_status(sc);
-    sc = sl_bt_advertiser_set_data(advertising_set_handle, 1, sizeof(scan_rsp_data), scan_rsp_data); //scan response data
+    sc = sl_bt_legacy_advertiser_set_data(advertising_set_handle, 1, sizeof(scan_rsp_data), scan_rsp_data); //scan response data
     app_assert_status(sc);
     sc = sl_bt_advertiser_set_timing(advertising_set_handle, adv_period,adv_period,0,0);
     app_assert_status(sc);
-    sc = sl_bt_advertiser_start(advertising_set_handle, sl_bt_advertiser_general_discoverable,
-      sl_bt_advertiser_connectable_scannable);
+    sc = sl_bt_legacy_advertiser_start(advertising_set_handle, sl_bt_advertiser_connectable_scannable);
     app_assert_status(sc);
+    app_state = adv_test_advertising;
   } else if (app_state == verify_custom_bgapi) {
     /* Send custom BGAPI command and print response */
     printf("Sending custom user message to target...\n");
@@ -1255,6 +1255,8 @@ void main_app_handler(void) {
     }
     app_state = advscan_run;
   } else if (app_state == conn_initiate) {
+      // record time in order for time parameter to be able to be used
+      start_time_us = cur_time_us();
       initiate_connection();
   }
   else if (ps_state == ps_none) {
@@ -1415,6 +1417,7 @@ static void process_procedure_complete_event(sl_bt_msg_t *evt)
       app_assert_status(procedure_result);
       if (!procedure_result) {
         // Discover successful, start characteristic discovery.
+        app_log_debug("Service found, starting characteristic discovery\r\n");
         sc = sl_bt_gatt_discover_characteristics(conn_handle, bletest_throughput_service_handle);
         app_assert_status(sc);
         throughput_state = THROUGHPUT_FIND_CHARACTERISTICS;
@@ -1424,10 +1427,12 @@ static void process_procedure_complete_event(sl_bt_msg_t *evt)
       app_assert_status(procedure_result);
       if (!procedure_result) {
         if (bletest_throughput_write_with_response_handle != 0xFFFF && bletest_throughput_write_no_response_handle != 0xFFFF) {
+           app_log_debug("found char handles! bletest_throughput_write_with_response_handle=%d, bletest_throughput_write_no_response_handle=%d\r\n",
+            bletest_throughput_write_with_response_handle, bletest_throughput_write_no_response_handle);
           last_report_time_us = cur_time_us();
           if (bletest_throughput_ack == true) {
             throughput_state = THROUGHPUT_ACK;
-                      printf("Running throughput test with ack\r\n");
+            printf("Running throughput test with ack\r\n");
             // write with response (next write is handled by the procedure complete event)
             sc = sl_bt_gatt_write_characteristic_value(conn_handle,
                                                       bletest_throughput_write_with_response_handle,
