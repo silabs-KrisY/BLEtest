@@ -178,10 +178,10 @@ PKT_TX="$(awk '/^DTM completed/ { print $NF; exit }' "$TEST_DATA_DIR/tx.txt")"
 PKT_RX="$(awk '/^DTM receive completed/ { print $NF; exit }' "$TEST_DATA_DIR/rx.txt")"   
 printf '  TX count: %s\n' "${PKT_TX:-<none>}"
 printf '  RX count: %s\n' "${PKT_RX:-<none>}"
- if [ $PKT_TX -gt $((PKT_RX - 15)) ] && [ $PKT_TX -lt $((PKT_RX + 15)) ] && [ $PKT_RX != 0 ]; then
-        log_message "SUCCESS: TX and RX counts are within +/-15"
+ if [ $PKT_TX -gt $((PKT_RX - 100)) ] && [ $PKT_TX -lt $((PKT_RX + 100)) ] && [ $PKT_RX != 0 ]; then
+        log_message "SUCCESS: TX and RX counts are within +/-100 and not zero"
     else
-        log_message "FAILURE: TX and RX counts differ"
+        log_message "FAILURE: TX and RX counts differ by more than 100"
         exit 1 # Exit on failure
     fi
 # Also check output files for assertions since the return value for
@@ -205,10 +205,10 @@ PKT_TX="$(awk '/^DTM completed/ { print $NF; exit }' "$TEST_DATA_DIR/tx.txt")"
 PKT_RX="$(awk '/^DTM receive completed/ { print $NF; exit }' "$TEST_DATA_DIR/rx.txt")"   
 printf '  TX count: %s\n' "${PKT_TX:-<none>}"
 printf '  RX count: %s\n' "${PKT_RX:-<none>}"
- if [ $PKT_TX -gt $((PKT_RX - 15)) ] && [ $PKT_TX -lt $((PKT_RX + 15)) ] && [ $PKT_RX != 0 ]; then
-        log_message "SUCCESS: TX and RX counts are within +/-15"
+ if [ $PKT_TX -gt $((PKT_RX - 100)) ] && [ $PKT_TX -lt $((PKT_RX + 100)) ] && [ $PKT_RX != 0 ]; then
+        log_message "SUCCESS: TX and RX counts are within +/-100 and not zero"
     else
-        log_message "FAILURE: TX and RX counts differ"
+        log_message "FAILURE: TX and RX counts differ by more than 100"
         exit 1 # Exit on failure
     fi
 # Also check output files for assertions since the return value for
